@@ -1261,7 +1261,7 @@ def create_app():
 
                         method=gr.Textbox(value="create", label="method", info=f"yee the req_method."),
                         
-                        image=gr.Textbox(value="xoo4foo/zzvllm45:latest", label="image", info=f"Dockerhub vLLM image"),
+                        image=gr.Textbox(value="xoo4foo/zzvllm46:latest", label="image", info=f"Dockerhub vLLM image"),
                         runtime=gr.Textbox(value="nvidia", label="runtime", info=f"Container runtime"),
                         shm_size=gr.Slider(1, 320, step=1, value=8, label="shm_size", info=f'Maximal GPU Memory in GB'),
                         
@@ -1282,7 +1282,7 @@ def create_app():
                         vllmcontainer=gr.Textbox(value="container_vllm_xoo", label="vllmcontainer", info=f"Select a container name which is running vLLM"),
                         # vllmcontainer=gr.Radio(["container_vllm_xoo", "container_vllm_oai", "Create New"], value="container_vllm_xoo", show_label=False, info="Select a vllms_prompt or create a new one. Where?"),
                         port=gr.Slider(1370, 1380, step=1, value=1370, label="port", info=f"Choose a port."),
-                        image=gr.Textbox(value="xoo4foo/zzvllm45:latest", label="image", info=f"Dockerhub vLLM image"),
+                        image=gr.Textbox(value="xoo4foo/zzvllm46:latest", label="image", info=f"Dockerhub vLLM image"),
                                                                         
                         max_model_len=gr.Slider(1024, 8192, step=1024, value=1024, label="max_model_len", info=f"Model context length. If unspecified, will be automatically derived from the model config."),
                         tensor_parallel_size=gr.Number(1, 8, value=1, label="tensor_parallel_size", info=f"Number of tensor parallel replicas."),

@@ -67,7 +67,7 @@ services:
   vllm:
     build:
       context: ./vllm
-    image: xoo4foo/zzvllm45:latest
+    image: xoo4foo/zzvllm46:latest
     runtime: nvidia
     deploy:
       resources:

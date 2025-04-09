@@ -18,12 +18,9 @@ import huggingface_hub
 from huggingface_hub import snapshot_download
 import logging
 import psutil
+import git
+from git import Repo
 
-
-
-def transcribe_audio(audio_file):
-    req_file = audio_file
-    return f'req_file: {req_file}'
 
 
 
@@ -53,6 +50,13 @@ GLOBAL_MEM_TOTAL = 0
 GLOBAL_MEM_USED = 0
 GLOBAL_MEM_FREE = 0
 GLOBAL_PROMPT = "A famous quote"
+GLOBAL_SEARCH_INPUT_TS = 0
+GLOBAL_SEARCH_INPUT_THRESHOLD = 10
+GLOBAL_SEARCH_REQUEST_TIMEOUT = 3
+GLOBAL_SEARCH_INITIAL_DELAY = 10
+
+
+
 
 try:
     r = redis.Redis(host="redis", port=6379, db=0)
@@ -95,6 +99,52 @@ with open(DEFAULTS_PATH, "r", encoding="utf-8") as f:
 
 
 
+        
+        
+def dropdown_load_tested_models():
+    tested_models = [
+        {
+        "id": "Qwen/Qwen2.5-1.5B-Instruct",
+        },
+        {
+        "id": "PowerInfer/SmallThinker-3B-Preview",
+        },
+        {
+        "id": "bigcode/starcoder2-3b",
+        },
+        {
+        "id": "bigcode/starcoder2-7b",
+        },
+        {
+        "id": "ibm-granite/granite-3.0-1b-a400m-base",
+        },
+        {
+        "id": "stabilityai/stablelm-3b-4e1t",
+        },
+        {
+        "id": "Qwen/Qwen1.5-MoE-A2.7B-Chat",
+        },
+        {
+        "id": "adept/persimmon-8b-chat",
+        },
+        {
+        "id": "adept/persimmon-8b-base",
+        },
+        {
+        "id": "allenai/OLMoE-1B-7B-0924-Instruct",
+        },
+        {
+        "id": "facebook/opt-125m",
+        }
+    ]
+    global current_models_data
+    response_models = tested_models
+    print(f'response_models: {response_models}')
+    current_models_data = response_models.copy()
+    model_ids = [m["id"] for m in response_models]
+    print(f'model_ids: {model_ids}')
+    # return gr.update(choices=model_ids, value=response_models[0]["id"], visible=True)
+    return [gr.update(choices=model_ids, value=response_models[0]["id"], visible=True),gr.update(value=response_models[0]["id"],show_label=True, label=f'Loaded {len(model_ids)} models!')]
 
 
 
@@ -201,6 +251,100 @@ def docker_api_delete(req_model):
         print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] {e}')
         return f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] error action delete {e}'
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def search_change(input_text):
+    global GLOBAL_SEARCH_INPUT_TS
+    global current_models_data
+    current_ts = int(datetime.now().timestamp())
+    if GLOBAL_SEARCH_INPUT_TS + GLOBAL_SEARCH_INPUT_THRESHOLD > current_ts:
+        wait_time = GLOBAL_SEARCH_INPUT_TS + GLOBAL_SEARCH_INPUT_THRESHOLD - current_ts
+        return [gr.update(show_label=False),gr.update(show_label=True, label=f'Found {len(current_models_data)} models! Please wait {wait_time} sec or click on search')]
+    if len(input_text) < 3: 
+        # return [gr.update(show_label=False),gr.update(show_label=True, label=" < 3")]
+        return [gr.update(show_label=False),gr.update(show_label=True)]
+    if GLOBAL_SEARCH_INPUT_TS == 0 and len(input_text) > 5:
+        GLOBAL_SEARCH_INPUT_TS = int(datetime.now().timestamp())
+        res_huggingface_hub_search_model_ids,  res_huggingface_hub_search_current_value = search_models(input_text)
+        if len(res_huggingface_hub_search_model_ids) >= 1000:
+            return [gr.update(choices=res_huggingface_hub_search_model_ids, value=res_huggingface_hub_search_current_value, visible=True),gr.update(show_label=True, label=f'Found >1000 models!')]
+        return [gr.update(choices=res_huggingface_hub_search_model_ids, value=res_huggingface_hub_search_current_value, visible=True),gr.update(show_label=True, label=f'Found {len(res_huggingface_hub_search_model_ids)} models!')]
+        
+    if GLOBAL_SEARCH_INPUT_TS == 0:
+        GLOBAL_SEARCH_INPUT_TS = int(datetime.now().timestamp()) + GLOBAL_SEARCH_INITIAL_DELAY
+        return [gr.update(show_label=False),gr.update(show_label=True, label=f'Waiting auto search {GLOBAL_SEARCH_INITIAL_DELAY} sec')]
+    if GLOBAL_SEARCH_INPUT_TS + GLOBAL_SEARCH_INPUT_THRESHOLD <= current_ts:
+        GLOBAL_SEARCH_INPUT_TS = int(datetime.now().timestamp())
+        res_huggingface_hub_search_model_ids,  res_huggingface_hub_search_current_value = search_models(input_text)
+        if len(res_huggingface_hub_search_model_ids) >= 1000:
+            return [gr.update(choices=res_huggingface_hub_search_model_ids, value=res_huggingface_hub_search_current_value, visible=True),gr.update(show_label=True, label=f'Found >1000 models!')]
+        return [gr.update(choices=res_huggingface_hub_search_model_ids, value=res_huggingface_hub_search_current_value, visible=True),gr.update(show_label=True, label=f'Found {len(res_huggingface_hub_search_model_ids)} models!')]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 def search_models(query):
     try:
         global current_models_data    
@@ -213,6 +357,119 @@ def search_models(query):
         return gr.update(choices=model_ids, value=response_models[0]["id"], show_label=True, label=f'found {len(response_models)} models!')
     except Exception as e:
         print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] {e}')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def format_bytes(req_format, req_size):
+    if req_format == "human":
+        for unit in ("", "K", "M", "G", "T", "P", "E", "Z"):
+            if abs(req_size) < 1024.0:
+                return f'{req_size:3.1f}{unit}B'
+            req_size /= 1024.0
+        return f'{req_size:.1f}YiB'
+    elif req_format == "bytes":
+        req_size = req_size.upper()
+        if 'KB' in req_size:
+            return int(float(req_size.replace('KB', '').strip()) * 1024)
+        elif 'MB' in req_size:
+            return int(float(req_size.replace('MB', '').strip()) * 1024 * 1024)
+        elif 'GB' in req_size:
+            return int(float(req_size.replace('GB', '').strip()) * 1024 * 1024 * 1024)
+        elif 'B' in req_size:
+            return int(float(req_size.replace('B', '').strip()))
+        return 0
+    else:
+        raise ValueError("Invalid format specified. Use 'human' or 'bytes'.")
+
+
+
+
+def convert_to_bytes(size_str):
+    """Convert human-readable file size to bytes"""
+    size_str = size_str.upper()
+    if 'KB' in size_str:
+        return int(float(size_str.replace('KB', '').strip()) * 1024)
+    elif 'MB' in size_str:
+        return int(float(size_str.replace('MB', '').strip()) * 1024 * 1024)
+    elif 'GB' in size_str:
+        return int(float(size_str.replace('GB', '').strip()) * 1024 * 1024 * 1024)
+    elif 'B' in size_str:
+        return int(float(size_str.replace('B', '').strip()))
+    return 0
+
+
+
+
+
+
+
+
+def get_git_model_size(selected_id):    
+    try:
+        repo = Repo.clone_from(f'https://huggingface.co/{selected_id}', selected_id, no_checkout=True)
+    except git.exc.GitCommandError as e:
+        if "already exists and is not an empty directory" in str(e):
+            repo = Repo(selected_id)
+        else:
+            raise
+    
+    lfs_files = repo.git.lfs("ls-files", "-s").splitlines()
+    files_list = []
+    for line in lfs_files:
+        parts = line.split(" - ")
+        if len(parts) == 2:
+            file_hash, file_info = parts
+            file_parts = file_info.rsplit(" (", 1)
+            if len(file_parts) == 2:
+                file_name = file_parts[0]
+                size_str = file_parts[1].replace(")", "")
+                size_bytes = format_bytes("bytes",size_str)
+                
+                files_list.append({
+                    "id": file_hash.strip(),
+                    "file": file_name.strip(),
+                    "size": size_bytes,
+                    "size_human": size_str
+                })
+            
+        
+    return sum([file["size"] for file in files_list]), format_bytes("human",sum([file["size"] for file in files_list]))
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 def calculate_model_size(json_info): # to fix    
     try:
@@ -255,10 +512,13 @@ def calculate_model_size(json_info): # to fix
         return 0
 
 
+
+
+
 def get_info(selected_id):
     
     print(f' @@@ [get_info] 0')
-    logging.info(f' @@@ [get_info] 0')   
+    print(f' @@@ [get_info] 0')   
     container_name = ""
     res_model_data = {
         "search_data" : "",
@@ -272,33 +532,33 @@ def get_info(selected_id):
     
     if selected_id == None:
         print(f' @@@ [get_info] selected_id NOT FOUND!! RETURN ')
-        logging.info(f' @@@ [get_info] selected_id NOT FOUND!! RETURN ') 
+        print(f' @@@ [get_info] selected_id NOT FOUND!! RETURN ') 
         return res_model_data["search_data"], res_model_data["model_id"], res_model_data["architectures"], res_model_data["pipeline_tag"], res_model_data["transformers"], res_model_data["private"], res_model_data["downloads"], container_name
     
-    global current_models_data
+    global GLOBAL_CURRENT_MODELS_DATA
     global GLOBAL_SELECTED_MODEL_ID
     GLOBAL_SELECTED_MODEL_ID = selected_id
     print(f' @@@ [get_info] {selected_id} 2')
-    logging.info(f' @@@ [get_info] {selected_id} 2')  
+    print(f' @@@ [get_info] {selected_id} 2')  
     
     print(f' @@@ [get_info] {selected_id} 3')
-    logging.info(f' @@@ [get_info] {selected_id} 3')  
+    print(f' @@@ [get_info] {selected_id} 3')  
     container_name = str(res_model_data["model_id"]).replace('/', '_')
     print(f' @@@ [get_info] {selected_id} 4')
-    logging.info(f' @@@ [get_info] {selected_id} 4')  
-    if len(current_models_data) < 1:
-        print(f' @@@ [get_info] len(current_models_data) < 1! RETURN ')
-        logging.info(f' @@@ [get_info] len(current_models_data) < 1! RETURN ') 
+    print(f' @@@ [get_info] {selected_id} 4')  
+    if len(GLOBAL_CURRENT_MODELS_DATA) < 1:
+        print(f' @@@ [get_info] len(GLOBAL_CURRENT_MODELS_DATA) < 1! RETURN ')
+        print(f' @@@ [get_info] len(GLOBAL_CURRENT_MODELS_DATA) < 1! RETURN ') 
         return res_model_data["search_data"], res_model_data["model_id"], res_model_data["architectures"], res_model_data["pipeline_tag"], res_model_data["transformers"], res_model_data["private"], res_model_data["downloads"], container_name
     try:
         print(f' @@@ [get_info] {selected_id} 5')
-        logging.info(f' @@@ [get_info] {selected_id} 5') 
-        for item in current_models_data:
+        print(f' @@@ [get_info] {selected_id} 5') 
+        for item in GLOBAL_CURRENT_MODELS_DATA:
             print(f' @@@ [get_info] {selected_id} 6')
-            logging.info(f' @@@ [get_info] {selected_id} 6') 
+            print(f' @@@ [get_info] {selected_id} 6') 
             if item['id'] == selected_id:
                 print(f' @@@ [get_info] {selected_id} 7')
-                logging.info(f' @@@ [get_info] {selected_id} 7') 
+                print(f' @@@ [get_info] {selected_id} 7') 
                 res_model_data["search_data"] = item
                 
                 if "pipeline_tag" in item:
@@ -322,20 +582,27 @@ def get_info(selected_id):
                 container_name = str(res_model_data["model_id"]).replace('/', '_')
                 
                 print(f' @@@ [get_info] {selected_id} 8')
-                logging.info(f' @@@ [get_info] {selected_id} 8') 
+                print(f' @@@ [get_info] {selected_id} 8') 
                 
                 return res_model_data["search_data"], res_model_data["model_id"], res_model_data["architectures"], res_model_data["pipeline_tag"], res_model_data["transformers"], res_model_data["private"], res_model_data["downloads"], container_name
             else:
                 
                 print(f' @@@ [get_info] {selected_id} 9')
-                logging.info(f' @@@ [get_info] {selected_id} 9') 
+                print(f' @@@ [get_info] {selected_id} 9') 
                 
                 return res_model_data["search_data"], res_model_data["model_id"], res_model_data["architectures"], res_model_data["pipeline_tag"], res_model_data["transformers"], res_model_data["private"], res_model_data["downloads"], container_name
     except Exception as e:
         print(f' @@@ [get_info] {selected_id} 10')
-        logging.info(f' @@@ [get_info] {selected_id} 10') 
+        print(f' @@@ [get_info] {selected_id} 10') 
         print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] {e}')
         return res_model_data["search_data"], res_model_data["model_id"], res_model_data["architectures"], res_model_data["pipeline_tag"], res_model_data["transformers"], res_model_data["private"], res_model_data["downloads"], container_name
+
+
+
+
+
+
+
 
 def get_additional_info(selected_id):    
         res_model_data = {
@@ -348,6 +615,7 @@ def get_additional_info(selected_id):
             "tokenizer_config" : "",
             "model_id" : selected_id,
             "size" : 0,
+            "size_human" : 0,
             "gated" : "",
             "torch_dtype" : "",
             "hidden_size" : "",
@@ -374,13 +642,13 @@ def get_additional_info(selected_id):
                 
                 if "safetensors" in model_info.__dict__:
                     print(f'  FOUND safetensors')
-                    logging.info(f'  GFOUND safetensors')   
+                    print(f'  GFOUND safetensors')   
                     
                     safetensors_json = vars(model_info.safetensors)
                     
                     
                     print(f'  FOUND safetensors:::::::: {safetensors_json}')
-                    logging.info(f'  GFOUND safetensors:::::::: {safetensors_json}') 
+                    print(f'  GFOUND safetensors:::::::: {safetensors_json}') 
                     try:
                         quantization_key = next(iter(safetensors_json['parameters'].keys()))
                         print(f'  FOUND first key in parameters:::::::: {quantization_key}')
@@ -391,20 +659,20 @@ def get_additional_info(selected_id):
                         pass
                     
                     print(f'  FOUND safetensors TOTAL :::::::: {safetensors_json["total"]}')
-                    logging.info(f'  GFOUND safetensors:::::::: {safetensors_json["total"]}')
+                    print(f'  GFOUND safetensors:::::::: {safetensors_json["total"]}')
                                         
                     print(f'  ooOOOOOOOOoooooo res_model_data["quantization"] {res_model_data["quantization"]}')
-                    logging.info(f'ooOOOOOOOOoooooo res_model_data["quantization"] {res_model_data["quantization"]}')
+                    print(f'ooOOOOOOOOoooooo res_model_data["quantization"] {res_model_data["quantization"]}')
                     if res_model_data["quantization"] == "F32":
                         print(f'  ooOOOOOOOOoooooo found F32 -> x4')
-                        logging.info(f'ooOOOOOOOOoooooo found F32 -> x4')
+                        print(f'ooOOOOOOOOoooooo found F32 -> x4')
                     else:
                         print(f'  ooOOOOOOOOoooooo NUUUH FIND F32 -> x2')
-                        logging.info(f'ooOOOOOOOOoooooo NUUUH FIND F32 -> x2')
+                        print(f'ooOOOOOOOOoooooo NUUUH FIND F32 -> x2')
                         res_model_data['size'] = int(safetensors_json["total"]) * 2
                 else:
                     print(f' !!!!DIDNT FIND safetensors !!!! :::::::: ')
-                    logging.info(f' !!!!!! DIDNT FIND safetensors !!:::::::: ') 
+                    print(f' !!!!!! DIDNT FIND safetensors !!:::::::: ') 
             
             
             
@@ -413,8 +681,7 @@ def get_additional_info(selected_id):
                 pass
                     
             try:
-                url = f'https://huggingface.co/{selected_id}/resolve/main/config.json'
-                response = requests.get(url)
+                response = requests.get(f'https://huggingface.co/{selected_id}/resolve/main/config.json', timeout=GLOBAL_SEARCH_REQUEST_TIMEOUT)
                 if response.status_code == 200:
                     response_json = response.json()
                     res_model_data["config_data"] = response_json
@@ -425,11 +692,11 @@ def get_additional_info(selected_id):
                     if "torch_dtype" in res_model_data["config_data"]:
                         res_model_data["torch_dtype"] = res_model_data["config_data"]["torch_dtype"]
                         print(f'  ooOOOOOOOOoooooo torch_dtype: {res_model_data["torch_dtype"]}')
-                        logging.info(f'ooOOOOOOOOoooooo torch_dtype: {res_model_data["torch_dtype"]}')
+                        print(f'ooOOOOOOOOoooooo torch_dtype: {res_model_data["torch_dtype"]}')
                     if "hidden_size" in res_model_data["config_data"]:
                         res_model_data["hidden_size"] = res_model_data["config_data"]["hidden_size"]
                         print(f'  ooOOOOOOOOoooooo hidden_size: {res_model_data["hidden_size"]}')
-                        logging.info(f'ooOOOOOOOOoooooo hidden_size: {res_model_data["hidden_size"]}')
+                        print(f'ooOOOOOOOOoooooo hidden_size: {res_model_data["hidden_size"]}')
                 else:
                     res_model_data["config_data"] = f'{response.status_code}'
                     
@@ -437,35 +704,20 @@ def get_additional_info(selected_id):
                 res_model_data["config_data"] = f'{get_config_json_err}'
                 pass                       
             
-            if res_model_data["size"] == 0:
-                print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] **************** [get_additional_info] res_model_data["size"] == 0 ...')
-                logging.info(f' **************** [get_additional_info] res_model_data["size"] == 0...')
-                try:
-                    res_model_data["size"] = calculate_model_size(res_model_data["config_data"]) 
-                except Exception as get_config_json_err:
-                    res_model_data["size"] = 0
+            
 
-            # quantization size 
-            if res_model_data['quantization'] == "F32" or res_model_data["torch_dtype"] == "float32":
-                res_model_data["size"] = res_model_data["size"] * 2
-                print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] **************** res_model_data["size"] * 2 ...')
-                logging.info(f' **************** res_model_data["size"] * 2...')
-    
-    
-            return res_model_data["hf_data"], res_model_data["config_data"], res_model_data["architectures"], res_model_data["model_id"], res_model_data["size"], res_model_data["gated"], res_model_data["model_type"], res_model_data["quantization"], res_model_data["torch_dtype"], res_model_data["hidden_size"]
+            res_model_data["size"], res_model_data["size_human"] = get_git_model_size(selected_id)
+            
+            return res_model_data["hf_data"], res_model_data["config_data"], res_model_data["architectures"], res_model_data["model_id"], gr.update(value=res_model_data["size"], label=f'size ({res_model_data["size_human"]})'), res_model_data["gated"], res_model_data["model_type"], res_model_data["quantization"], res_model_data["torch_dtype"], res_model_data["hidden_size"]
         
         except Exception as e:
             print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] {e}')
-            return res_model_data["hf_data"], res_model_data["config_data"], res_model_data["model_id"], res_model_data["size"], res_model_data["gated"], res_model_data["model_type"],  res_model_data["quantization"], res_model_data["torch_dtype"], res_model_data["hidden_size"]
+            return res_model_data["hf_data"], res_model_data["config_data"], res_model_data["model_id"], gr.update(value=res_model_data["size"], label=f'size ({res_model_data["size_human"]})'), res_model_data["gated"], res_model_data["model_type"],  res_model_data["quantization"], res_model_data["torch_dtype"], res_model_data["hidden_size"]
+
 
 def gr_load_check(selected_model_id, selected_model_architectures, selected_model_pipeline_tag, selected_model_transformers, selected_model_size, selected_model_private, selected_model_gated, selected_model_model_type, selected_model_quantization):
     
-    global GLOBAL_MEM_TOTAL
-    global GLOBAL_MEM_USED
-    global GLOBAL_MEM_FREE
-    
 
-    
     
     # check CUDA support mit backend call
     
@@ -476,33 +728,32 @@ def gr_load_check(selected_model_id, selected_model_architectures, selected_mode
     req_model_path = f'{req_model_storage}/{selected_model_id}'
     
     print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] **************** [gr_load_check] searching {selected_model_id} in {req_model_storage} (req_model_path: {req_model_path}) ...')
-    logging.info(f' **************** [gr_load_check] searching {selected_model_id} in {req_model_storage} (req_model_path: {req_model_path})...')
+    print(f' **************** [gr_load_check] searching {selected_model_id} in {req_model_storage} (req_model_path: {req_model_path})...')
     
 
 
     models_found = []
-    try:                   
-        if os.path.isdir(req_model_storage):
-            print(f' **************** found model storage path! {req_model_storage}')
-            print(f' **************** getting folder elements ...')       
-            logging.info(f' **************** found model storage path! {req_model_storage}')
-            logging.info(f' **************** getting folder elements ...')                        
-            for m_entry in os.listdir(req_model_storage):
-                m_path = os.path.join(req_model_storage, m_entry)
-                if os.path.isdir(m_path):
-                    for item_sub in os.listdir(m_path):
-                        sub_item_path = os.path.join(m_path, item_sub)
-                        models_found.append(sub_item_path)        
-            print(f' **************** found models ({len(models_found)}): {models_found}')
-            logging.info(f' **************** found models ({len(models_found)}): {models_found}')
-        else:
-            print(f' **************** found models ({len(models_found)}): {models_found}')
-            logging.info(f' **************** ERR model path not found! {req_model_storage}')
-    except Exception as e:
-        logging.info(f' **************** ERR getting models in {req_model_storage}: {e}')
+    # try:                   
+    #     if os.path.isdir(req_model_storage):
+    #         print(f' **************** found model storage path! {req_model_storage}')
+    #         print(f' **************** getting folder elements ...')       
+    #         print(f' **************** found model storage path! {req_model_storage}')
+    #         print(f' **************** getting folder elements ...')                        
+    #         for m_entry in os.listdir(req_model_storage):
+    #             m_path = os.path.join(req_model_storage, m_entry)
+    #             if os.path.isdir(m_path):
+    #                 for item_sub in os.listdir(m_path):
+    #                     sub_item_path = os.path.join(m_path, item_sub)
+    #                     models_found.append(sub_item_path)        
+    #         print(f' **************** found models ({len(models_found)}): {models_found}')
+    #         print(f' **************** found models ({len(models_found)}): {models_found}')
+    #     else:
+    #         print(f' **************** found models ({len(models_found)}): {models_found}')
 
-    
-    logging.info(f' **************** does requested model path match downloaded?')
+    # except Exception as e:
+    #     print(f' **************** ERR getting models in {req_model_storage}: {e}')
+
+
     model_path = selected_model_id
     if req_model_path in models_found:
         print(f' **************** FOUND MODELS ALREADY!!! {selected_model_id} ist in {models_found}')
@@ -515,16 +766,13 @@ def gr_load_check(selected_model_id, selected_model_architectures, selected_mode
         
     if selected_model_architectures == '':
         return f'Selected model has no architecture', gr.update(visible=False), gr.update(visible=False)
-    
-    
-    print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] **************** [gr_load_check] selected_model_architectures.lower() : {selected_model_architectures.lower()}')
-    logging.info(f' **************** [gr_load_check] selected_model_architectures.lower() : {selected_model_architectures.lower()}')
 
-    if selected_model_architectures.lower() not in defaults_frontend['vllm_supported_architectures']:
-        if selected_model_transformers != 'True':   
-            return f'Selected model architecture is not supported by vLLM but transformers are available (you may try to load the model in gradio Interface)', gr.update(visible=True), gr.update(visible=True)
-        else:
-            return f'Selected model architecture is not supported by vLLM and has no transformers', gr.update(visible=False), gr.update(visible=False)     
+
+    # if selected_model_architectures.lower() not in defaults_frontend['vllm_supported_architectures']:
+    #     if selected_model_transformers != 'True':   
+    #         return f'Selected model architecture is not supported by vLLM but transformers are available (you may try to load the model in gradio Interface)', gr.update(visible=True), gr.update(visible=True)
+    #     else:
+    #         return f'Selected model architecture is not supported by vLLM and has no transformers', gr.update(visible=False), gr.update(visible=False)     
     
     if selected_model_pipeline_tag == '':
         return f'Selected model has no pipeline tag', gr.update(visible=True), gr.update(visible=True)
@@ -545,71 +793,193 @@ def gr_load_check(selected_model_id, selected_model_architectures, selected_mode
         return f'Selected model has no size', gr.update(visible=False), gr.update(visible=False)
 
 
-
-
-    
-    # print(f' **>>> gr_load_check !! !! !! >> 0 >> {GLOBAL_MEM_TOTAL}')
-    # logging.info(f' **>>> gr_load_check !! !! !! >> 0 >> {GLOBAL_MEM_TOTAL}')
-    # print(f' **>>> gr_load_check !! !! !! >> 0 >> {GLOBAL_MEM_USED}')
-    # logging.info(f' **>>> gr_load_check !! !! !! >> 0 >> {GLOBAL_MEM_USED}')
-    # print(f' **>>> gr_load_check !! !! !! >> 0 >> {GLOBAL_MEM_FREE}')
-    # logging.info(f' **>>> gr_load_check !! !! !! >> 0 >> {GLOBAL_MEM_FREE}')
-    
-    # if selected_model_id == '':
-    #     return f'Model not found!', gr.update(visible=False), gr.update(visible=False), gr.update(visible=False)
-    
-    
-    
-    
-    # print(f' HÄÄÄÄÄÄÄÄÄ bis hier oder net')
-    # logging.info(f' HÄÄÄÄÄÄÄÄÄ bis hier oder net')
-    
-    
-    
-    
-    
-    # print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] ********* [gr_load_check] checking if enough memory size for selected model available ....  ...')
-    # logging.info(f' ********* [gr_load_check] checking if enough memory size for selected model available .... ...')    
-    
-    # print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] ********* [gr_load_check] GLOBAL_MEM_TOTAL {GLOBAL_MEM_TOTAL}')
-    # logging.info(f' ********* [gr_load_check] GLOBAL_MEM_TOTAL {GLOBAL_MEM_TOTAL} ')    
-    # print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] ********* [gr_load_check] GLOBAL_MEM_USED {GLOBAL_MEM_USED}')
-    # logging.info(f' ********* [gr_load_check] GLOBAL_MEM_USED {GLOBAL_MEM_USED} ')    
-    # print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] ********* [gr_load_check] GLOBAL_MEM_FREE {GLOBAL_MEM_FREE}')
-    # logging.info(f' ********* [gr_load_check] GLOBAL_MEM_FREE {GLOBAL_MEM_FREE} ')
-    
- 
-    # print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] ********* [gr_load_check] selected_model_size {selected_model_size}')
-    # logging.info(f' ********* [gr_load_check] selected_model_size {selected_model_size} ')
-    
-    
-    # print(f' HÄÄÄÄÄÄÄÄÄ bis hier oder net 2')
-    # logging.info(f' HÄÄÄÄÄÄÄÄÄ bis hier oder net 2')
-    
-    
-    # # check model > size memory size
-    # if float(selected_model_size) > (float(GLOBAL_MEM_TOTAL.split()[0])*1024**2):
-    #     print(f' HÄÄÄÄÄÄÄÄÄ bis hier oder net 444')
-    #     logging.info(f' HÄÄÄÄÄÄÄÄÄ bis hier oder net 444')
-    #     return f'ERR: model size extends GPU memory! {float(selected_model_size)}/{(float(GLOBAL_MEM_TOTAL.split()[0])*1024**2)} ', gr.update(visible=True), gr.update(visible=True), gr.update(visible=True)
-    #     # return f'ERR: model size extends GPU memory!', gr.update(visible=False), gr.update(visible=False), gr.update(visible=False)
-    
-    # if float(selected_model_size) > (float(GLOBAL_MEM_FREE.split()[0])*1024**2):
-    #     print(f' HÄÄÄÄÄÄÄÄÄ bis hier oder net 555')
-    #     logging.info(f' HÄÄÄÄÄÄÄÄÄ bis hier oder net 555')
-    #     return f'Please clear GPU memory! {float(selected_model_size)}/{(float(GLOBAL_MEM_FREE.split()[0])*1024**2)} ', gr.update(visible=True), gr.update(visible=True), gr.update(visible=True)
-    
-    
-
-    
-    # print(f' HÄÄÄÄÄÄÄÄÄ bis hier oder net 3 ')
-    # logging.info(f' HÄÄÄÄÄÄÄÄÄ bis hier oder net 3')
-    
-    
+    return f'Selected model is supported by vLLM!'
 
 
 
-    return f'Selected model is supported by vLLM!', gr.update(visible=True), gr.update(visible=True)
+
+
+
+
+
+
+def redis_connection(**kwargs):
+    try:
+        if not kwargs:
+            print(f' **REDIS: Error: no kwargs')
+            return False
+        else:
+            print(f' **REDIS: kwargs: {kwargs}')
+        
+        if not kwargs["db_name"]:
+            print(f' **REDIS: Error: no db_name')
+            return False
+            
+        if not kwargs["method"]:
+            print(f' **REDIS: Error: no method')
+            return False
+            
+        if not kwargs["select"]:
+            print(f' **REDIS: Error: no select')
+            return False
+
+        res_db_list = r.lrange(kwargs["db_name"], 0, -1)
+
+        print(f' **REDIS: found {len(res_db_list)} entries!')
+        res_db_list = [json.loads(entry) for entry in res_db_list]
+        
+        if kwargs["select"] == "filter":
+            if not kwargs["filter_key"]:
+                print(f' **REDIS: Error: no filter_key')
+                return False
+            
+            if not kwargs["filter_val"]:
+                print(f' **REDIS: Error: no filter_val')
+                return False
+
+            res_db_list = [entry for entry in res_db_list if entry[kwargs["filter_key"]] == kwargs["filter_val"]]
+            print(f' **REDIS: filtered: {len(res_db_list)}')
+        
+        if kwargs["method"] == "get":
+            return res_db_list
+            
+        if kwargs["method"] == "update":
+            if len(res_db_list) > 0:
+                update_i = 0
+                for entry in [json.dumps(entry) for entry in res_db_list]:
+                    r.lrem(kwargs["db_name"], 0, entry)
+                    entry = json.loads(entry)
+                    entry["ts"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    r.rpush(kwargs["db_name"], json.dumps(entry))
+                    update_i = update_i + 1
+                print(f' **REDIS: updated ({update_i}/{len(res_db_list)})!')
+                return res_db_list
+            else:
+                print(f' **REDIS: Error: no entry to update for db_name: {kwargs["db_name"]}')
+                return False
+        
+        if kwargs["method"] == "save":
+            data_obj = {
+                "id": kwargs.get("id", "0"),
+                "State": {
+                    "Status": "running"
+                },
+                "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            }        
+            r.rpush(kwargs["db_name"], json.dumps(data_obj))
+            print(f' **REDIS: saved!')
+            return res_db_list
+        
+        return False
+    
+    except Exception as e:
+        print(f' **REDIS: Error: {e}')
+        return False
+
+
+
+
+                
+def toggle_compute_type(device):
+    
+    if device == 'cpu':
+        return gr.update(choices=["int8"], value="int8")
+    
+    return gr.update(choices=["int8_float16", "float16"], value="float16")
+
+
+
+
+
+
+def get_audio_path(audio_file):
+    req_file = audio_file
+    return [f'req_file: {req_file}', f'{req_file}']
+
+def transcribe_audio(audio_model,audio_path,device,compute_type):  
+    try:
+        print(f'[transcribe_audio] audio_path ... {audio_path}')
+        logging.info(f'[transcribe_audio] audio_path ... {audio_path}')
+      
+        AUDIO_URL = f'http://container_audio:{os.getenv("AUDIO_PORT")}/t'
+
+        print(f'[transcribe_audio] AUDIO_URL ... {AUDIO_URL}')
+        logging.info(f'[transcribe_audio] AUDIO_URL ... {AUDIO_URL}')
+
+        print(f'[transcribe_audio] getting status ... ')
+        logging.info(f'[transcribe_audio] getting status ... ')
+        
+        response = requests.post(AUDIO_URL, json={
+            "method": "status"
+        }, timeout=GLOBAL_SEARCH_REQUEST_TIMEOUT)
+
+        if response.status_code == 200:          
+            print(f'[transcribe_audio] >> got response == 200 ... building json ... {response}')
+            logging.info(f'[transcribe_audio] >> got response == 200 ... building json ... {response}')
+            res_json = response.json()    
+            print(f'[transcribe_audio] >> got res_json ... {res_json}')
+            logging.info(f'[transcribe_audio] >> got res_json ... {res_json}')
+
+            if res_json["result_data"] == "ok":
+                print(f'[transcribe_audio] >> status: "ok" ... starting transcribe .... ')
+                logging.info(f'[transcribe_audio] >> status: "ok" ... starting transcribe .... ')
+      
+                response = requests.post(AUDIO_URL, json={
+                    "method": "transcribe",
+                    "audio_model": audio_model,
+                    "audio_path": audio_path,
+                    "device": device,
+                    "compute_type": compute_type
+                })
+
+                print(f'[transcribe_audio] >> got response #22222 == 200 ... building json ... {response}')
+                logging.info(f'[transcribe_audio] >> got response #22222 == 200 ... building json ... {response}')
+                
+                res_json = response.json()
+   
+                print(f'[transcribe_audio] >> #22222 got res_json ... {res_json}')
+                logging.info(f'[transcribe_audio] >> #22222 got res_json ... {res_json}')
+                
+                if res_json["result_status"] == 200:
+                    return f'{res_json["result_data"]}'
+                else: 
+                    return 'Error :/'
+            else:
+                print('[transcribe_audio] ERROR AUDIO SERVER DOWN!?')
+                logging.info('[transcribe_audio] ERROR AUDIO SERVER DOWN!?')
+                return 'Error :/'
+
+    except Exception as e:
+        return f'Error: {e}'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 def network_to_pd():       
     rows = []
@@ -1191,25 +1561,43 @@ def parallel_download(selected_model_size, model_dropdown):
     return "Download finished!"
 
 
+
+
+
+
+
+
+
 def create_app():
     with gr.Blocks() as app:
         gr.Markdown(
-            """
-            # Welcome!
-            Select a _[Hugging Face Model](https://huggingface.co/models)_ and deploy it with vLLM
-            
-            **Note**: _[vLLM supported models list](https://docs.vllm.ai/en/latest/models/supported_models.html)_
-            or """)
+        """
+        # Welcome!
+        Select a Hugging Face model and deploy it on a port
+        # Hallo!
+        Testen Sie LLM AI Models auf verschiedenen Ports mit custom vLLM images
+        **Note**: _[vLLM supported models list](https://docs.vllm.ai/en/latest/models/supported_models.html)_        
+        """)
         btn_tested = gr.Button("select a tested model", size="sm")
-
-        input_search = gr.Textbox(placeholder="Type in a Hugging Face model or tag", show_label=False, autofocus=True)
+        input_search = gr.Textbox(placeholder="Enter Hugging Face model name or tag", label=f'found 0 models', show_label=False, autofocus=True)
         btn_search = gr.Button("Search")
+        btn_tested_models = gr.Button("Load tested models")
+        
+
+
+
+
+
+
+
+
+
 
         with gr.Row(visible=False) as row_model_select:
             model_dropdown = gr.Dropdown(choices=[''], interactive=True, show_label=False)
         with gr.Row(visible=False) as row_model_info:
             with gr.Column(scale=4):
-                with gr.Accordion(("Model Parameters"), open=False):                    
+                with gr.Accordion(("Model Parameters"), open=False):
                     with gr.Row():
                         selected_model_id = gr.Textbox(label="id")
                         selected_model_container_name = gr.Textbox(label="container_name")
@@ -1224,10 +1612,10 @@ def create_app():
                     with gr.Row():
                         selected_model_model_type = gr.Textbox(label="model_type")
                         selected_model_quantization = gr.Textbox(label="quantization")
+                        selected_model_torch_dtype = gr.Textbox(label="torch_dtype")
                         selected_model_size = gr.Textbox(label="size")
-                        selected_model_torch_dtype = gr.Textbox(label="torch_dtype")        
-                        selected_model_hidden_size = gr.Textbox(label="hidden_size")                        
-                        
+                        selected_model_hidden_size = gr.Textbox(label="hidden_size", visible=False)
+
                     with gr.Row():
                         selected_model_private = gr.Textbox(label="private")
                         selected_model_gated = gr.Textbox(label="gated")
@@ -1246,8 +1634,48 @@ def create_app():
                         
         
         
-        output = gr.Textbox(label="Output", lines=4, show_label=True, visible=True)   
+        output = gr.Textbox(label="Output", lines=4, show_label=True, visible=True)     
+        
         # aaaa
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         kekw = gr.Textbox(label="kekw")
         with gr.Row(visible=True) as row_vllm:
             with gr.Column(scale=4):
@@ -1344,33 +1772,50 @@ def create_app():
 
 
 
-
-
-
-
-
-
         with gr.Column(scale=1, visible=True) as vllm_running_engine_argumnts_btn:
             vllm_running_engine_arguments_show = gr.Button("LOAD VLLM CREATEEEEEEEEUUUUHHHHHHHH", variant="primary")
             vllm_running_engine_arguments_close = gr.Button("CANCEL")
 
                 
+
+
+
+
+
+        with gr.Tab("lion"):
+            lion_output = gr.Textbox(label="lion")
+            gr.Image("lion.jpg")
+            gr.Button("lion")
+        with gr.Tab("tiger"):
+            gr.Image("tiger.jpg")
+            gr.Button("tiger")
+
+
+        # aaaa3
+                
         with gr.Accordion(("Automatic Speech Recognition"), open=False, visible=True) as acc_audio:
             with gr.Row():
                 with gr.Column(scale=2):
                     audio_input = gr.Audio(label="Upload Audio", type="filepath")
-                
+                    audio_model=gr.Dropdown(defaults_frontend['audio_models'], label="Model size", info="Select a Faster-Whisper model")
+                    audio_path = gr.Textbox(visible=False)
+                    device=gr.Radio(["cpu", "cuda"], value="cpu", label="Select architecture", info="Your system supports CUDA!. Make sure all drivers installed. /checkcuda if cuda")
+                    compute_type=gr.Radio(["int8"], value="int8", label="Compute type", info="Select a compute type")
                 with gr.Column(scale=1):
                     text_output = gr.Textbox(label="Transcription", lines=8)
-                
+                    
                     transcribe_btn = gr.Button("Transcribe")
                     transcribe_btn.click(
-                        transcribe_audio,
-                        inputs=audio_input,
-                        outputs=text_output
+                      get_audio_path,
+                      audio_input,
+                      [text_output,audio_path]
+                    ).then(
+                      transcribe_audio,
+                      [audio_model,audio_path,device,compute_type],
+                      text_output
                     )
-            
         
+
         
         btn_interface = gr.Button("Load Interface",visible=False)
         @gr.render(inputs=[selected_model_pipeline_tag, selected_model_id], triggers=[btn_interface.click])
@@ -1413,6 +1858,120 @@ def create_app():
         load_btn = gr.Button("Load into vLLM (port: 1370)", visible=True)
 
         
+
+
+
+
+
+
+
+
+
+
+
+        # aaaa2
+
+
+
+
+
+
+        req_db = "db_test1"
+
+        test_call_save = {
+                        "db_name": req_db,
+                        "method": "save",
+                        "select": "all",
+                        "id": "3",
+                        "State": {
+                            "Status": "running"
+                        },
+                        "ts": "0"
+                    }
+
+        test_call_get = {
+                        "db_name": req_db,
+                        "method": "get",
+                        "select": "all"
+                    }
+
+        test_call_update = {
+                        "db_name": req_db,
+                        "method": "update",
+                        "select": "filter",
+                        "filter_key": "id",
+                        "filter_val": "3",
+                    }
+
+
+
+
+        print(f'__________________________________ save ___________________________________')
+        redis_connection(**test_call_save)
+        print(f'________________________________________________________________________')
+        print(f'')
+                    
+                
+        print(f'__________________________________ get __________________________________')
+        test_vllms = redis_connection(**test_call_get)
+        test_vllms_list_running = [c for c in test_vllms if c["State"]["Status"] == "running"]
+        print(f'________________________________________________________________________')
+        print(f'1')
+        print(f'{test_vllms}')
+        print(f'2')
+        print(f'{test_vllms_list_running}')
+        print(f'3')
+        test_vllm = [{'id': '2', 'State': {'Status': 'running'}, 'ts': '2025-04-07 00:47:00'}, {'id': '2', 'State': {'Status': 'running'}, 'ts': '2025-04-07 00:47:00'}, {'id': '2', 'State': {'Status': 'running'}, 'ts': '2025-04-07 00:47:00'}, {'id': '3', 'State': {'Status': 'running'}, 'ts': '2025-04-07 00:47:00'}]
+        print(f'4')
+        print(type(test_vllms))  # Should be `<class 'list'>`
+        print(f'5')
+        test_vllms_state = gr.State([])       
+        @gr.render(inputs=test_vllms_state)
+        def render_test_vllms(render_test_vllms_list):
+            test_vllms_list_running = [c for c in test_vllms if c["State"]["Status"] == "running"]
+            test_vllms_list_not_running = [c for c in test_vllms if c["State"]["Status"] != "running"]
+            with gr.Accordion(f'test_vllms | Running {len(test_vllms_list_running)} | Not Running {len(test_vllms_list_not_running)}', open=True):
+                gr.Markdown(f'### Running ({len(test_vllms_list_running)})')
+
+                for current_container in test_vllms_list_running:
+                    with gr.Row():
+                        
+                        test_vllm_id = gr.Textbox(value=current_container["id"], interactive=False, elem_classes="table-cell", label="test_vllm_id")
+                        
+                        test_vllm_status = gr.Textbox(value=current_container["State"]["Status"], interactive=False, elem_classes="table-cell", label="test_vllm_status")
+                    
+                    gr.Markdown(
+                        """
+                        <hr>
+                        """
+                    )
+                
+                gr.Markdown(f'### Not running ({len(test_vllms_list_not_running)})')
+                        
+                for current_container in test_vllms_list_not_running:
+                    with gr.Row():                            
+                        test_vllm_id = gr.Textbox(value=current_container["id"], interactive=False, elem_classes="table-cell", label="test_vllm_id")
+                        
+                        test_vllm_status = gr.Textbox(value=current_container["State"]["Status"], interactive=False, elem_classes="table-cell", label="test_vllm_status")    
+
+                    gr.Markdown(
+                        """
+                        <hr>
+                        """
+                    )
+        
+
+
+
+
+
+
+
+
+
+
+
+
 
         
         container_state = gr.State([])   
@@ -1664,28 +2223,68 @@ def create_app():
                         <hr>
                         """
                     )
-
-
+        
+        
+        device.change(
+            toggle_compute_type,
+            device,
+            [compute_type]
+        )
+        
+        
+        
+        
+        
+        input_search.change(
+            search_change,
+            input_search,
+            [model_dropdown,input_search],
+            show_progress=False
+        )
+        
         input_search.submit(
             search_models, 
             input_search, 
-            [model_dropdown]
+            [model_dropdown,input_search]
         ).then(
-            lambda: gr.update(visible=True), 
+            lambda: gr.update(visible=True),
             None, 
             model_dropdown
         )
         
         btn_search.click(
-            search_models, 
-            input_search, 
-            [model_dropdown]
+            search_models, input_search, 
+            [model_dropdown,input_search]
         ).then(
-            lambda: gr.update(visible=True), 
-            None, 
+            lambda: gr.update(visible=True),
+            None,
             model_dropdown
         )
 
+        btn_tested_models.click(
+            dropdown_load_tested_models,
+            None,
+            [model_dropdown,input_search]
+        )
+
+
+
+
+        
+        # input_search.submit(search_models, inputs=input_search, outputs=[model_dropdown,input_search]).then(lambda: gr.update(visible=True), None, model_dropdown)
+        # btn_search.click(search_models, inputs=input_search, outputs=[model_dropdown,input_search]).then(lambda: gr.update(visible=True), None, model_dropdown)
+
+        # btn_tested_models.click(
+        #     dropdown_load_tested_models,
+        #     None,
+        #     [model_dropdown,input_search]
+        # )
+
+
+
+
+
+        
 
         btn_dl.click(
             parallel_download, 

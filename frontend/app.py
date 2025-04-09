@@ -140,7 +140,7 @@ def get_disk_data():
 
 def get_docker_container_list():
     global docker_container_list
-    response = requests.post(f'http://{os.getenv("CONTAINER_BACKEND")}:{os.getenv("BACKEND_PORT")}/docker', json={"method":"list"})
+    response = requests.post(f'http://container_backend:{os.getenv("BACKEND_PORT")}/docker', json={"method":"list"})
     # print(f'[get_docker_container_list] response: {response}')
     res_json = response.json()
     # print(f'[get_docker_container_list] res_json: {res_json}')
@@ -155,7 +155,7 @@ def get_docker_container_list():
 
 def docker_api_logs(req_model):
     try:
-        response = requests.post(f'http://{os.getenv("CONTAINER_BACKEND")}:{os.getenv("BACKEND_PORT")}/docker', json={"method":"logs","model":req_model})
+        response = requests.post(f'http://container_backend:{os.getenv("BACKEND_PORT")}/docker', json={"method":"logs","model":req_model})
         res_json = response.json()
         return ''.join(res_json["result_data"])
     except Exception as e:
@@ -164,7 +164,7 @@ def docker_api_logs(req_model):
 
 def docker_api_network(req_container_name):
     try:
-        response = requests.post(f'http://{os.getenv("CONTAINER_BACKEND")}:{os.getenv("BACKEND_PORT")}/docker', json={"method":"network","container_name":req_container_name})
+        response = requests.post(f'http://container_backend:{os.getenv("BACKEND_PORT")}/docker', json={"method":"network","container_name":req_container_name})
         res_json = response.json()
         if res_json["result"] == 200:
             return f'{res_json["result_data"]["networks"]["eth0"]["rx_bytes"]}'
@@ -176,7 +176,7 @@ def docker_api_network(req_container_name):
     
 def docker_api_start(req_model):
     try:
-        response = requests.post(f'http://{os.getenv("CONTAINER_BACKEND")}:{os.getenv("BACKEND_PORT")}/docker', json={"method":"start","model":req_model})
+        response = requests.post(f'http://container_backend:{os.getenv("BACKEND_PORT")}/docker', json={"method":"start","model":req_model})
         res_json = response.json()
         return res_json
     except Exception as e:
@@ -185,7 +185,7 @@ def docker_api_start(req_model):
 
 def docker_api_stop(req_model):
     try:
-        response = requests.post(f'http://{os.getenv("CONTAINER_BACKEND")}:{os.getenv("BACKEND_PORT")}/docker', json={"method":"stop","model":req_model})
+        response = requests.post(f'http://container_backend:{os.getenv("BACKEND_PORT")}/docker', json={"method":"stop","model":req_model})
         res_json = response.json()
         return res_json
     except Exception as e:
@@ -194,7 +194,7 @@ def docker_api_stop(req_model):
 
 def docker_api_delete(req_model):
     try:
-        response = requests.post(f'http://{os.getenv("CONTAINER_BACKEND")}:{os.getenv("BACKEND_PORT")}/docker', json={"method":"delete","model":req_model})
+        response = requests.post(f'http://container_backend:{os.getenv("BACKEND_PORT")}/docker', json={"method":"delete","model":req_model})
         res_json = response.json()
         return res_json
     except Exception as e:
@@ -699,10 +699,14 @@ def get_redis(req_db_name, req_container_value):
     print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [get_redis] >>> GOT REQ >>> {req_db_name} {req_container_value}')
     logging.info(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [get_redis] >>> GOT REQ >>>  {req_db_name} {req_container_value}')
     try:
+        print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [get_redis] trying to get res_db_list')
+        logging.info(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [get_redis] trying to get res_db_list')
         res_db_list = r.lrange(req_db_name, 0, -1)
+        print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [get_redis] >>> res_db_list {res_db_list}')
+        logging.info(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [get_redis] >>> res_db_list {res_db_list}')
         res_db_list_json = [json.loads(entry) for entry in res_db_list]
-        print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [get_redis] >>> GOT REQ >>> res_db_list {res_db_list}')
-        logging.info(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [get_redis] >>> GOT REQ >>> res_db_list {res_db_list}')
+        print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [get_redis] >>> res_db_list_json {res_db_list_json}')
+        logging.info(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [get_redis] >>> res_db_list_json {res_db_list_json}')
     except Exception as e:
         print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [get_redis] >>> REDIS COULDNT GET DATA RETURNING DEFAULT')
         logging.info(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [get_redis] >>> REDIS COULDNT GET DATA RETURNING DEFAULT')
@@ -820,7 +824,7 @@ gpu_to_pd()
 def refresh_container():
     try:
         global docker_container_list
-        response = requests.post(f'http://{os.getenv("CONTAINER_BACKEND")}:{os.getenv("BACKEND_PORT")}/docker', json={"method": "list"})
+        response = requests.post(f'http://container_backend:{os.getenv("BACKEND_PORT")}/docker', json={"method": "list"})
         docker_container_list = response.json()
         return docker_container_list
     
@@ -903,7 +907,7 @@ class PromptValues:
     max_tokens: int
 
 
-BACKEND_URL = f'http://{os.getenv("CONTAINER_BACKEND")}:{os.getenv("BACKEND_PORT")}/docker'
+BACKEND_URL = f'http://container_backend:{os.getenv("BACKEND_PORT")}/docker'
 
 
 def toggle_vllm_load_create(vllm_list):
@@ -1257,7 +1261,7 @@ def create_app():
 
                         method=gr.Textbox(value="create", label="method", info=f"yee the req_method."),
                         
-                        image=gr.Textbox(value="xoo4foo/zzvllm44:latest", label="image", info=f"Dockerhub vLLM image"),
+                        image=gr.Textbox(value="xoo4foo/zzvllm45:latest", label="image", info=f"Dockerhub vLLM image"),
                         runtime=gr.Textbox(value="nvidia", label="runtime", info=f"Container runtime"),
                         shm_size=gr.Slider(1, 320, step=1, value=8, label="shm_size", info=f'Maximal GPU Memory in GB'),
                         
@@ -1278,7 +1282,7 @@ def create_app():
                         vllmcontainer=gr.Textbox(value="container_vllm_xoo", label="vllmcontainer", info=f"Select a container name which is running vLLM"),
                         # vllmcontainer=gr.Radio(["container_vllm_xoo", "container_vllm_oai", "Create New"], value="container_vllm_xoo", show_label=False, info="Select a vllms_prompt or create a new one. Where?"),
                         port=gr.Slider(1370, 1380, step=1, value=1370, label="port", info=f"Choose a port."),
-                        image=gr.Textbox(value="xoo4foo/zzvllm44:latest", label="image", info=f"Dockerhub vLLM image"),
+                        image=gr.Textbox(value="xoo4foo/zzvllm45:latest", label="image", info=f"Dockerhub vLLM image"),
                                                                         
                         max_model_len=gr.Slider(1024, 8192, step=1024, value=1024, label="max_model_len", info=f"Model context length. If unspecified, will be automatically derived from the model config."),
                         tensor_parallel_size=gr.Number(1, 8, value=1, label="tensor_parallel_size", info=f"Number of tensor parallel replicas."),
@@ -1416,15 +1420,15 @@ def create_app():
         @gr.render(inputs=container_state)
         def render_container(render_container_list):
             docker_container_list = get_docker_container_list()
-            docker_container_list_sys_running = [c for c in docker_container_list if c["State"]["Status"] == "running" and c["Name"] in [f'/{os.getenv("CONTAINER_REDIS")}',f'/{os.getenv("CONTAINER_BACKEND")}', f'/{os.getenv("CONTAINER_FRONTEND")}', f'/{os.getenv("CONTAINER_AUDIO")}']]
-            docker_container_list_sys_not_running = [c for c in docker_container_list if c["State"]["Status"] != "running" and c["Name"] in [f'/{os.getenv("CONTAINER_REDIS")}',f'/{os.getenv("CONTAINER_BACKEND")}', f'/{os.getenv("CONTAINER_FRONTEND")}', f'/{os.getenv("CONTAINER_AUDIO")}']]
-            docker_container_list_vllm_running = [c for c in docker_container_list if c["State"]["Status"] == "running" and c["Name"] not in [f'/{os.getenv("CONTAINER_REDIS")}',f'/{os.getenv("CONTAINER_BACKEND")}', f'/{os.getenv("CONTAINER_FRONTEND")}', f'/{os.getenv("CONTAINER_AUDIO")}']]
-            docker_container_list_vllm_not_running = [c for c in docker_container_list if c["State"]["Status"] != "running" and c["Name"] not in [f'/{os.getenv("CONTAINER_REDIS")}',f'/{os.getenv("CONTAINER_BACKEND")}', f'/{os.getenv("CONTAINER_FRONTEND")}', f'/{os.getenv("CONTAINER_AUDIO")}']]
+            docker_container_list_sys_running = [c for c in docker_container_list if c["State"]["Status"] == "running" and c["Name"] in [f'/{os.getenv("CONTAINER_REDIS")}',f'/container_backend', f'/{os.getenv("CONTAINER_FRONTEND")}', f'/{os.getenv("CONTAINER_AUDIO")}']]
+            docker_container_list_sys_not_running = [c for c in docker_container_list if c["State"]["Status"] != "running" and c["Name"] in [f'/{os.getenv("CONTAINER_REDIS")}',f'/container_backend', f'/{os.getenv("CONTAINER_FRONTEND")}', f'/{os.getenv("CONTAINER_AUDIO")}']]
+            docker_container_list_vllm_running = [c for c in docker_container_list if c["State"]["Status"] == "running" and c["Name"] not in [f'/{os.getenv("CONTAINER_REDIS")}',f'/container_backend', f'/{os.getenv("CONTAINER_FRONTEND")}', f'/{os.getenv("CONTAINER_AUDIO")}']]
+            docker_container_list_vllm_not_running = [c for c in docker_container_list if c["State"]["Status"] != "running" and c["Name"] not in [f'/{os.getenv("CONTAINER_REDIS")}',f'/container_backend', f'/{os.getenv("CONTAINER_FRONTEND")}', f'/{os.getenv("CONTAINER_AUDIO")}']]
 
             def refresh_container():
                 try:
                     global docker_container_list
-                    response = requests.post(f'http://{os.getenv("CONTAINER_BACKEND")}:{os.getenv("BACKEND_PORT")}/docker', json={"method": "list"})
+                    response = requests.post(f'http://container_backend:{os.getenv("BACKEND_PORT")}/docker', json={"method": "list"})
                     docker_container_list = response.json()
                     return docker_container_list
                 
@@ -1901,14 +1905,14 @@ def create_app():
         network_timer.tick(network_to_pd, outputs=[network_dataframe,kekw])
         
         container_timer = gr.Timer(20,active=True)
-        container_timer.tick(refresh_container,outputs=[container_state])
+        container_timer.tick(refresh_container,None,None) # aaaaa
 
 
     return app
 
 # Launch the app
 if __name__ == "__main__":
-    backend_url = f'http://{os.getenv("CONTAINER_BACKEND")}:{os.getenv("BACKEND_PORT")}/docker'
+    backend_url = f'http://container_backend:{os.getenv("BACKEND_PORT")}/docker'
     
     # Wait for the backend container to be online
     if wait_for_backend(backend_url):

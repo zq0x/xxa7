@@ -2525,12 +2525,12 @@ def create_app():
             testtext
         )
 
-        vllm_timer = gr.Timer(1,active=True)
-        vllm_timer.tick(
-            redis_connection(**test_call_update_all),
-            None,
-            disk_dataframe
-        )
+        # vllm_timer = gr.Timer(1,active=True)
+        # vllm_timer.tick(
+        #     redis_connection(**test_call_update_all),
+        #     None,
+        #     disk_dataframe
+        # )
         
         
         timer_c = gr.Timer(10,active=False)

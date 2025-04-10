@@ -57,6 +57,41 @@ GLOBAL_SEARCH_INITIAL_DELAY = 10
 
 
 
+req_db = "db_test1"
+
+test_call_save = {
+                "db_name": req_db,
+                "method": "save",
+                "select": "all",
+                "id": "3",
+                "State": {
+                    "Status": "running"
+                },
+                "ts": "0"
+            }
+
+test_call_get = {
+                "db_name": req_db,
+                "method": "get",
+                "select": "all"
+            }
+
+test_call_update = {
+                "db_name": req_db,
+                "method": "update",
+                "select": "filter",
+                "filter_key": "id",
+                "filter_val": "3",
+            }
+
+test_call_update_all = {
+                "db_name": req_db,
+                "method": "update",
+                "select": "all"
+            }
+
+
+
 
 try:
     r = redis.Redis(host="redis", port=6379, db=0)
@@ -65,6 +100,23 @@ try:
     db_gpu_data_len = len(db_gpu_data)
 except Exception as e:
     print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] {e}')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 LOG_PATH= './logs'
 LOGFILE_CONTAINER = './logs/logfile_container_frontend.log'
@@ -94,6 +146,143 @@ with open(DEFAULTS_PATH, "r", encoding="utf-8") as f:
     defaults_frontend = json.load(f)["frontend"]
     logging.info(f' [START] SUCCESS! Loaded: {DEFAULTS_PATH}')
     logging.info(f' [START] {len(defaults_frontend['vllm_supported_architectures'])} supported vLLM architectures found!')
+
+
+
+
+
+
+
+
+
+
+
+def redis_connection(**kwargs):
+    try:
+        if not kwargs:
+            print(f' **REDIS: Error: no kwargs')
+            return False
+        else:
+            print(f' **REDIS: kwargs: {kwargs}')
+        
+        if not kwargs["db_name"]:
+            print(f' **REDIS: Error: no db_name')
+            return False
+            
+        if not kwargs["method"]:
+            print(f' **REDIS: Error: no method')
+            return False
+            
+        if not kwargs["select"]:
+            print(f' **REDIS: Error: no select')
+            return False
+
+        res_db_list = r.lrange(kwargs["db_name"], 0, -1)
+
+        print(f' **REDIS: found {len(res_db_list)} entries!')
+        res_db_list = [json.loads(entry) for entry in res_db_list]
+        
+        if kwargs["select"] == "filter":
+            if not kwargs["filter_key"]:
+                print(f' **REDIS: Error: no filter_key')
+                return False
+            
+            if not kwargs["filter_val"]:
+                print(f' **REDIS: Error: no filter_val')
+                return False
+
+            res_db_list = [entry for entry in res_db_list if entry[kwargs["filter_key"]] == kwargs["filter_val"]]
+            print(f' **REDIS: filtered: {len(res_db_list)}')
+        
+        if kwargs["method"] == "get":
+            return res_db_list
+            
+        if kwargs["method"] == "update":
+            if len(res_db_list) > 0:
+                update_i = 0
+                for entry in [json.dumps(entry) for entry in res_db_list]:
+                    r.lrem(kwargs["db_name"], 0, entry)
+                    entry = json.loads(entry)
+                    entry["ts"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    r.rpush(kwargs["db_name"], json.dumps(entry))
+                    update_i = update_i + 1
+                print(f' **REDIS: updated ({update_i}/{len(res_db_list)})!')
+                return res_db_list
+            else:
+                print(f' **REDIS: Error: no entry to update for db_name: {kwargs["db_name"]}')
+                return False
+        
+        if kwargs["method"] == "save":
+            data_obj = {
+                "id": kwargs.get("id", "0"),
+                "State": {
+                    "Status": "running"
+                },
+                "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            }        
+            r.rpush(kwargs["db_name"], json.dumps(data_obj))
+            print(f' **REDIS: saved!')
+            return res_db_list
+        
+        return False
+    
+    except Exception as e:
+        print(f' **REDIS: Error: {e}')
+        return False
+
+
+
+
+
+
+
+
+
+
+
+
+print(f'__________________________________ save ___________________________________')
+redis_connection(**test_call_save)
+print(f'________________________________________________________________________')
+print(f'')
+            
+        
+print(f'__________________________________ get __________________________________')
+test_vllms = redis_connection(**test_call_get)
+test_vllms_list_running = [c for c in test_vllms if c["State"]["Status"] == "running"]
+print(f'________________________________________________________________________')
+print(f'1')
+print(f'{test_vllms}')
+print(f'2')
+print(f'{test_vllms_list_running}')
+print(f'3')
+test_vllm = [{'id': '2', 'State': {'Status': 'running'}, 'ts': '2025-04-07 00:47:00'}, {'id': '2', 'State': {'Status': 'running'}, 'ts': '2025-04-07 00:47:00'}, {'id': '2', 'State': {'Status': 'running'}, 'ts': '2025-04-07 00:47:00'}, {'id': '3', 'State': {'Status': 'running'}, 'ts': '2025-04-07 00:47:00'}]
+print(f'4')
+print(type(test_vllms))  # Should be `<class 'list'>`
+print(f'5')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -801,84 +990,6 @@ def gr_load_check(selected_model_id, selected_model_architectures, selected_mode
 
 
 
-
-
-def redis_connection(**kwargs):
-    try:
-        if not kwargs:
-            print(f' **REDIS: Error: no kwargs')
-            return False
-        else:
-            print(f' **REDIS: kwargs: {kwargs}')
-        
-        if not kwargs["db_name"]:
-            print(f' **REDIS: Error: no db_name')
-            return False
-            
-        if not kwargs["method"]:
-            print(f' **REDIS: Error: no method')
-            return False
-            
-        if not kwargs["select"]:
-            print(f' **REDIS: Error: no select')
-            return False
-
-        res_db_list = r.lrange(kwargs["db_name"], 0, -1)
-
-        print(f' **REDIS: found {len(res_db_list)} entries!')
-        res_db_list = [json.loads(entry) for entry in res_db_list]
-        
-        if kwargs["select"] == "filter":
-            if not kwargs["filter_key"]:
-                print(f' **REDIS: Error: no filter_key')
-                return False
-            
-            if not kwargs["filter_val"]:
-                print(f' **REDIS: Error: no filter_val')
-                return False
-
-            res_db_list = [entry for entry in res_db_list if entry[kwargs["filter_key"]] == kwargs["filter_val"]]
-            print(f' **REDIS: filtered: {len(res_db_list)}')
-        
-        if kwargs["method"] == "get":
-            return res_db_list
-            
-        if kwargs["method"] == "update":
-            if len(res_db_list) > 0:
-                update_i = 0
-                for entry in [json.dumps(entry) for entry in res_db_list]:
-                    r.lrem(kwargs["db_name"], 0, entry)
-                    entry = json.loads(entry)
-                    entry["ts"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    r.rpush(kwargs["db_name"], json.dumps(entry))
-                    update_i = update_i + 1
-                print(f' **REDIS: updated ({update_i}/{len(res_db_list)})!')
-                return res_db_list
-            else:
-                print(f' **REDIS: Error: no entry to update for db_name: {kwargs["db_name"]}')
-                return False
-        
-        if kwargs["method"] == "save":
-            data_obj = {
-                "id": kwargs.get("id", "0"),
-                "State": {
-                    "Status": "running"
-                },
-                "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            }        
-            r.rpush(kwargs["db_name"], json.dumps(data_obj))
-            print(f' **REDIS: saved!')
-            return res_db_list
-        
-        return False
-    
-    except Exception as e:
-        print(f' **REDIS: Error: {e}')
-        return False
-
-
-
-
                 
 def toggle_compute_type(device):
     
@@ -1065,79 +1176,6 @@ def disk_to_pd():
 
 disk_to_pd()
 
-def get_redis(req_db_name, req_container_value):
-    print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [get_redis] >>> GOT REQ >>> {req_db_name} {req_container_value}')
-    logging.info(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [get_redis] >>> GOT REQ >>>  {req_db_name} {req_container_value}')
-    try:
-        print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [get_redis] trying to get res_db_list')
-        logging.info(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [get_redis] trying to get res_db_list')
-        res_db_list = r.lrange(req_db_name, 0, -1)
-        print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [get_redis] >>> res_db_list {res_db_list}')
-        logging.info(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [get_redis] >>> res_db_list {res_db_list}')
-        res_db_list_json = [json.loads(entry) for entry in res_db_list]
-        print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [get_redis] >>> res_db_list_json {res_db_list_json}')
-        logging.info(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [get_redis] >>> res_db_list_json {res_db_list_json}')
-    except Exception as e:
-        print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [get_redis] >>> REDIS COULDNT GET DATA RETURNING DEFAULT')
-        logging.info(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [get_redis] >>> REDIS COULDNT GET DATA RETURNING DEFAULT')
-        res_default = {
-            "db_name": "0",
-            "vllm_id": "0",
-            "model": "0", 
-            "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
-        return [res_default]
-    res_db_list_json = [json.loads(entry) for entry in res_db_list]
-    print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [get_redis] >>> GOT REQ >>> res_db_list_json {res_db_list_json}')
-    logging.info(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [get_redis] >>> GOT REQ >>> res_db_list_json {res_db_list_json}')
-    if res_db_list:
-        # res_db_list = [json.loads(entry) for entry in res_db_list]
-        # print(f'res_db_list: {res_db_list}')
-        # res_db_filtered = [entry for entry in res_db_list_json if entry["container"] == req_container_value]
-        res_db_filtered_kappa = [entry for entry in res_db_list_json]
-        # print(f'res_db_filtered: {res_db_filtered}')
-        return res_db_filtered_kappa
-    else:
-        print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [get_redis] >>> GOT REQ >>> res_db_list_json {res_db_list_json}')
-        logging.info(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [get_redis] >>> GOT REQ >>> res_db_list_json {res_db_list_json}')
-        print(f'No data found for {req_db_name}')
-        return []
-
-# all_b = get_redis("db_vllm","b")
-# print(f'all_b')
-# print(f'{all_b}')
-
-# aaaaa
-
-
-# redis_data = {"db_name": "db_vllm", "vllm_id": "10", "model": "blabla", "ts": "123"}
-def vllm_to_pd():
-    rows = []
-    try:
-        print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [vllm_to_pd] ** getting vllm_db data ...')
-        logging.info(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [vllm_to_pd] ** getting vllm_db data ...')
-        # vllm_list = get_vllm_data()
-        vllm_list = get_redis("db_vllm","b")
-        
-        print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [vllm_to_pd] got vllm_list: {vllm_list}')
-        logging.info(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [vllm_to_pd] got vllm_list: {vllm_list}')
-        for entry in vllm_list:
-            # vllm_info = ast.literal_eval(entry['vllm_info'])
-            rows.append({                
-                "db_name": entry.get("db_name", "0"),
-                "vllm_id": entry.get("vllm_id", "0"),
-                "model": entry.get("model", "0"),
-                "ts": entry.get("ts", "0")            
-            })
-        df = pd.DataFrame(rows)
-        return df
-    
-    except Exception as e:
-        print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] {e}')
-        logging.info(f' &&&&&& !!!  [ERROR] [vllm_to_pd] GOT e {e}')
-
-vllm_to_pd()
-
 
 def gpu_to_pd():
     global GLOBAL_MEM_TOTAL
@@ -1187,6 +1225,38 @@ def gpu_to_pd():
         print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] {e}')
 
 gpu_to_pd()
+
+
+
+
+
+def get_vllms():
+    try:
+        global test_vllms
+        test_vllms = redis_connection(**test_call_get)
+        print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [get_vllms] GET! test_vllms: {test_vllms}')
+        return test_vllms
+    
+    except Exception as e:
+        print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [get_vllms] {e}')
+        return f'err {str(e)}'
+
+
+
+
+def update_vllms():
+    try:
+        redis_connection(**test_call_update_all)
+        test_vllms = get_vllms()
+        print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [update_vllms] UPDATE! test_vllms: {test_vllms}')
+        return test_vllms
+    
+    except Exception as e:
+        print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [update_vllms] {e}')
+        return f'err {str(e)}'
+
+
+
 
 
 
@@ -1733,13 +1803,12 @@ def create_app():
                             compute_type=gr.Radio(["int8"], value="int8", label="Compute type", info="Select a compute type")
                 
                     with gr.Column(scale=1):
-                        with gr.Row(visible=True) as row_vllm_audio_actions:
-                            with gr.Row() as vllm_prompt_output:
-                                audio_path = gr.Textbox(visible=True)
-                                text_output = gr.Textbox(label="Transcription", lines=8)
-                            with gr.Row() as vllm_prompt:
-                                transcribe_btn = gr.Button("Transcribe")
-                            
+                        with gr.Row() as vllm_prompt_output:
+                            audio_path = gr.Textbox(visible=True)
+                            text_output = gr.Textbox(label="Transcription", lines=8)
+                        with gr.Row() as vllm_prompt:
+                            transcribe_btn = gr.Button("Transcribe")
+                        
 
         
         
@@ -1833,10 +1902,6 @@ def create_app():
                 print(f'selected_model_id_arr {selected_model_id_arr}...')            
                 gr.Interface.from_pipeline(pipeline(text_pipeline, model=f'/models/{selected_model_id_arr[0]}/{selected_model_id_arr[1]}'))
 
-        timer_c = gr.Timer(1,active=False)
-        timer_c.tick(refresh_container)
-                
-
 
 
 
@@ -1881,56 +1946,6 @@ def create_app():
 
 
 
-
-        req_db = "db_test1"
-
-        test_call_save = {
-                        "db_name": req_db,
-                        "method": "save",
-                        "select": "all",
-                        "id": "3",
-                        "State": {
-                            "Status": "running"
-                        },
-                        "ts": "0"
-                    }
-
-        test_call_get = {
-                        "db_name": req_db,
-                        "method": "get",
-                        "select": "all"
-                    }
-
-        test_call_update = {
-                        "db_name": req_db,
-                        "method": "update",
-                        "select": "filter",
-                        "filter_key": "id",
-                        "filter_val": "3",
-                    }
-
-
-
-
-        print(f'__________________________________ save ___________________________________')
-        redis_connection(**test_call_save)
-        print(f'________________________________________________________________________')
-        print(f'')
-                    
-                
-        print(f'__________________________________ get __________________________________')
-        test_vllms = redis_connection(**test_call_get)
-        test_vllms_list_running = [c for c in test_vllms if c["State"]["Status"] == "running"]
-        print(f'________________________________________________________________________')
-        print(f'1')
-        print(f'{test_vllms}')
-        print(f'2')
-        print(f'{test_vllms_list_running}')
-        print(f'3')
-        test_vllm = [{'id': '2', 'State': {'Status': 'running'}, 'ts': '2025-04-07 00:47:00'}, {'id': '2', 'State': {'Status': 'running'}, 'ts': '2025-04-07 00:47:00'}, {'id': '2', 'State': {'Status': 'running'}, 'ts': '2025-04-07 00:47:00'}, {'id': '3', 'State': {'Status': 'running'}, 'ts': '2025-04-07 00:47:00'}]
-        print(f'4')
-        print(type(test_vllms))  # Should be `<class 'list'>`
-        print(f'5')
         test_vllms_state = gr.State([])       
         @gr.render(inputs=test_vllms_state)
         def render_test_vllms(render_test_vllms_list):
@@ -1942,9 +1957,11 @@ def create_app():
                 for current_container in test_vllms_list_running:
                     with gr.Row():
                         
-                        test_vllm_id = gr.Textbox(value=current_container["id"], interactive=False, elem_classes="table-cell", label="test_vllm_id")
+                        test_vllm_id = gr.Textbox(value=current_container["id"], elem_classes="table-cell", label="test_vllm_id")
                         
-                        test_vllm_status = gr.Textbox(value=current_container["State"]["Status"], interactive=False, elem_classes="table-cell", label="test_vllm_status")
+                        test_vllm_status = gr.Textbox(value=current_container["State"]["Status"], elem_classes="table-cell", label="test_vllm_status")
+                                            
+                        test_vllm_ts = gr.Textbox(value=current_container["ts"], elem_classes="table-cell", label="test_vllm_ts")
                     
                     gr.Markdown(
                         """
@@ -1956,9 +1973,13 @@ def create_app():
                         
                 for current_container in test_vllms_list_not_running:
                     with gr.Row():                            
-                        test_vllm_id = gr.Textbox(value=current_container["id"], interactive=False, elem_classes="table-cell", label="test_vllm_id")
                         
-                        test_vllm_status = gr.Textbox(value=current_container["State"]["Status"], interactive=False, elem_classes="table-cell", label="test_vllm_status")    
+                        test_vllm_id = gr.Textbox(value=current_container["id"], elem_classes="table-cell", label="test_vllm_id")
+                        
+                        test_vllm_status = gr.Textbox(value=current_container["State"]["Status"], elem_classes="table-cell", label="test_vllm_status")
+                                            
+                        test_vllm_ts = gr.Textbox(value=current_container["ts"], elem_classes="table-cell", label="test_vllm_ts")
+                    
 
                     gr.Markdown(
                         """
@@ -2504,6 +2525,22 @@ def create_app():
             testtext
         )
 
+        vllm_timer = gr.Timer(1,active=True)
+        vllm_timer.tick(
+            redis_connection(**test_call_update_all),
+            None,
+            disk_dataframe
+        )
+        
+        
+        timer_c = gr.Timer(10,active=False)
+        timer_c.tick(refresh_container)
+        
+        vllm_timer = gr.Timer(1,active=True)
+        vllm_timer.tick(update_vllms)
+                
+
+
         disk_timer = gr.Timer(1,active=True)
         disk_timer.tick(disk_to_pd, outputs=disk_dataframe)
 
@@ -2513,7 +2550,7 @@ def create_app():
         network_timer = gr.Timer(1,active=True)
         network_timer.tick(network_to_pd, outputs=[network_dataframe,kekw])
         
-        container_timer = gr.Timer(20,active=True)
+        container_timer = gr.Timer(5,active=True)
         container_timer.tick(refresh_container,None,None) # aaaaa
 
 

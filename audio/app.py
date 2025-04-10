@@ -6,36 +6,51 @@ from fastapi.responses import JSONResponse
 from datetime import datetime
 import os
 from faster_whisper import WhisperModel
-import pynvml
-import torch
+import logging
 
-audio_model = None
-def load_audio(req_model_size):
+
+
+LOG_PATH= './logs'
+LOGFILE_CONTAINER = f'{LOG_PATH}/logfile_container_audio.log'
+os.makedirs(os.path.dirname(LOGFILE_CONTAINER), exist_ok=True)
+logging.basicConfig(filename=LOGFILE_CONTAINER, level=logging.INFO, format='[%(asctime)s - %(name)s - %(levelname)s - %(message)s]')
+logging.info(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [START] started logging in {LOGFILE_CONTAINER}')
+
+
+
+
+
+current_model = None
+def load_audio(req_audio_model,req_device,req_compute_type):
     try:
-        global audio_model
-        print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [START] [load_audio] trying to start WhisperModel with size: {req_model_size}')
-        if audio_model is None:
-            audio_model = WhisperModel(req_model_size, device="cpu", compute_type="int8")
+        global current_model
+        print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [START] [load_audio] trying to start WhisperModel with req_audio_model: {req_audio_model}')
+        if current_model is None:
+            current_model = WhisperModel(req_audio_model, device=req_device, compute_type=req_compute_type)
             print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [START] [load_audio] [success] WhisperModel started!')
     
     except Exception as e:
             print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [START] [load_audio] [error] Failed to load WhisperModel')
             raise
 
-def transcribe_audio(req_model_size,audio_file_path):
+def transcribe_audio(audio_model,audio_path,device,compute_type):
     try:
-        print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [transcribe_audio] trying to load WhisperModel req_model_size: {req_model_size} ...')
-        load_audio(req_model_size)
+        print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [transcribe_audio] trying to load WhisperModel audio_model: {audio_model} device: {device} compute_type: {compute_type} audio_path: {audio_path} ...')
+        load_audio(audio_model,device,compute_type)
         print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [transcribe_audio] WhisperModel loaded!')
         
         start_time = time.time()
         
-        print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [transcribe_audio] trying to transcribe path: {audio_file_path} ...')
-        segments, info = audio_model.transcribe(audio_file_path)
+        print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [transcribe_audio] trying to transcribe path: {audio_path} ...')
+        segments, info = current_model.transcribe(audio_path)
         full_text = "\n".join([segment.text for segment in segments])
         processing_time = time.time() - start_time
         
-        print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [transcribe_audio] finished transcribing audio from {audio_file_path}! lang found: {info.language} len text_length: {len(full_text)} in {processing_time:.2f}s ...')
+        
+        
+        print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [transcribe_audio] finished transcribing audio from {audio_path}! lang found: {info.language} len text_length: {len(full_text)} in {processing_time:.2f}s ...')
+                
+        print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [transcribe_audio] full_text {full_text}')
         
         print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [transcribe_audio] returning ...')
         
@@ -57,40 +72,7 @@ def start_redis(req_redis_port):
         raise
 
 
-def initialize_nvml():
-    try:
-        pynvml.nvmlInit()
-        print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [START] [initialize_nvml] NVML initialized successfully.')
-    except Exception as e:
-        print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [START] [initialize_nvml] Failed to initialize NVML: {e}')
 
-initialize_nvml()
-
-
-def cuda_support_bool():
-    try:
-        res_cuda_support = torch.cuda.is_available()
-        if res_cuda_support:
-            print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [START] [cuda_support_bool] CUDA found')
-        else:
-            print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [START] [cuda_support_bool] CUDA not supported!')
-        return res_cuda_support
-    except Exception as e:
-        print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [START] [cuda_support_bool] {e}')
-        return False
-
-
-def cuda_device_count():
-    try:
-        res_gpu_int = torch.cuda.device_count()
-        res_gpu_int_arr = [i for i in range(res_gpu_int)]
-        print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [START] [cuda_support_bool] {str(res_gpu_int)}x GPUs found {res_gpu_int_arr}')
-        return res_gpu_int_arr
-    except Exception as e:
-        print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [START] [cuda_device_count] Failed to get device_count. Using default [0]. Error: {e}')
-        return [0]
-
-gpu_int_arr = cuda_device_count()
 
 
 
@@ -101,11 +83,33 @@ llm_instance = None
 @app.get("/")
 async def root():
     return f'Hello from audio server!'
-             
-@app.get("/t")
-async def fntest():
-    res_transcribe = transcribe_audio("small","nk.mp3")
-    return f'{res_transcribe}'
+
+@app.post("/t")
+async def fnaudio(request: Request):
+    try:
+        req_data = await request.json()
+        print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [audio] req_data > {req_data}')
+        logging.info(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [audio] req_data > {req_data}')
+
+        if req_data["method"] == "status":
+            return JSONResponse({"result_status": 200, "result_data": f'ok'})
+
+        if req_data["method"] == "transcribe":
+            print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [{req_data["method"]}] trying to transcribe ...')
+            logging.info(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [{req_data["method"]}] trying to transcribe ...')
+            res_transcribe = transcribe_audio(req_data["audio_model"],req_data["audio_path"],req_data["device"],req_data["compute_type"])
+            return JSONResponse({"result_status": 200, "result_data": f'{res_transcribe}'})
+
+
+    except Exception as e:
+        print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] {e}')
+        return JSONResponse({"result_status": 500, "result_data": f'{e}'})
+
+
+
+
+
+
 
 if __name__ == "__main__":
     import uvicorn

@@ -1979,10 +1979,10 @@ def create_app():
         @gr.render(inputs=container_state)
         def render_container(render_container_list):
             docker_container_list = get_docker_container_list()
-            docker_container_list_sys_running = [c for c in docker_container_list if c["State"]["Status"] == "running" and c["Name"] in [f'/{os.getenv("CONTAINER_REDIS")}',f'/container_backend', f'/{os.getenv("CONTAINER_FRONTEND")}', f'/{os.getenv("CONTAINER_AUDIO")}']]
-            docker_container_list_sys_not_running = [c for c in docker_container_list if c["State"]["Status"] != "running" and c["Name"] in [f'/{os.getenv("CONTAINER_REDIS")}',f'/container_backend', f'/{os.getenv("CONTAINER_FRONTEND")}', f'/{os.getenv("CONTAINER_AUDIO")}']]
-            docker_container_list_vllm_running = [c for c in docker_container_list if c["State"]["Status"] == "running" and c["Name"] not in [f'/{os.getenv("CONTAINER_REDIS")}',f'/container_backend', f'/{os.getenv("CONTAINER_FRONTEND")}', f'/{os.getenv("CONTAINER_AUDIO")}']]
-            docker_container_list_vllm_not_running = [c for c in docker_container_list if c["State"]["Status"] != "running" and c["Name"] not in [f'/{os.getenv("CONTAINER_REDIS")}',f'/container_backend', f'/{os.getenv("CONTAINER_FRONTEND")}', f'/{os.getenv("CONTAINER_AUDIO")}']]
+            docker_container_list_sys_running = [c for c in docker_container_list if c["State"]["Status"] == "running" and c["Name"] in [f'/container_redis',f'/container_backend', f'/container_frontend', f'/container_audio']]
+            docker_container_list_sys_not_running = [c for c in docker_container_list if c["State"]["Status"] != "running" and c["Name"] in [f'/container_redis',f'/container_backend', f'/container_frontend', f'/container_audio']]
+            docker_container_list_vllm_running = [c for c in docker_container_list if c["State"]["Status"] == "running" and c["Name"] not in [f'/container_redis',f'/container_backend', f'/container_frontend', f'/container_audio']]
+            docker_container_list_vllm_not_running = [c for c in docker_container_list if c["State"]["Status"] != "running" and c["Name"] not in [f'/container_redis',f'/container_backend', f'/container_frontend', f'/container_audio']]
 
             def refresh_container():
                 try:

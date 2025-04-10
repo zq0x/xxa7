@@ -17,12 +17,10 @@ services:
       - sys_net
     container_name: container_backend
     environment:
-      - REDIS_PORT=6379
       - BACKEND_IP=0.0.0.0
-      - BACKEND_PORT=7861
-      - CONTAINER_BACKEND=container_backend
-      - NETWORK=sys_net
       - VLLM_PORT=1370
+      - REDIS_PORT=6379
+      - BACKEND_PORT=7861
     volumes:
       - ./backend:/usr/src/app
       - ./utils:/usr/src/app/utils   
@@ -55,6 +53,7 @@ services:
       - ./utils:/usr/src/app/utils    
       - ../logs:/usr/src/app/logs
       - /models:/models
+      - /tmp:/tmp
     depends_on:
       - redis
     deploy:
@@ -138,19 +137,17 @@ services:
       - backend
       - vllm
     environment:
-      - FRONTEND_IP=0.0.0.0
-      - FRONTEND_PORT=7860
-      - CONTAINER_REDIS=container_redis
-      - CONTAINER_FRONTEND=container_frontend
-      - CONTAINER_BACKEND=container_backend
-      - CONTAINER_AUDIO=container_audio
-      - BACKEND_PORT=7861
+      - FRONTEND_IP=0.0.0.0      
       - VLLM_PORT=1370
+      - FRONTEND_PORT=7860
+      - BACKEND_PORT=7861
+      - AUDIO_PORT=8000
     volumes:
       - ./frontend:/usr/src/app
       - ./utils:/usr/src/app/utils    
       - ../logs:/usr/src/app/logs
       - /models:/models
+      - /tmp:/tmp
     deploy:
       resources:
         reservations:

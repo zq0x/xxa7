@@ -2537,7 +2537,7 @@ def create_app():
         timer_c.tick(refresh_container)
         
         vllm_timer = gr.Timer(1,active=True)
-        vllm_timer.tick(update_vllms)
+        vllm_timer.tick(update_vllms,outputs=[test_vllms_state])
                 
 
 

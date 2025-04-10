@@ -1653,7 +1653,7 @@ def create_app():
             with gr.TabItem("Load", id=1):
                 with gr.Row(visible=True) as row_vllm_load:
                     with gr.Column(scale=4):
-                        with gr.Accordion(("Load vLLM Parameters"), open=False, visible=True) as acc_load:
+                        with gr.Accordion(("Load vLLM Parameters"), open=True, visible=True) as acc_load:
                             vllm_load_components = VllmLoadComponents(
 
                                 method=gr.Textbox(value="load", label="method", info=f"yee the req_method."),
@@ -1674,7 +1674,7 @@ def create_app():
             with gr.TabItem("Create", id=2):
                 with gr.Row(visible=True) as row_vllm_create:
                     with gr.Column(scale=4):                         
-                        with gr.Accordion(("Create vLLM Parameters"), open=False, visible=True) as acc_create:
+                        with gr.Accordion(("Create vLLM Parameters"), open=True, visible=True) as acc_create:
                             vllm_create_components = VllmCreateComponents(
 
                                 method=gr.Textbox(value="create", label="method", info=f"yee the req_method."),
@@ -1699,7 +1699,7 @@ def create_app():
             with gr.TabItem("Prompt", id=3):
                 with gr.Row(visible=True) as row_vllm_prompt:
                     with gr.Column(scale=2):
-                        with gr.Accordion(("Prompt Parameters"), open=False, visible=True) as acc_prompt:
+                        with gr.Accordion(("Prompt Parameters"), open=True, visible=True) as acc_prompt:
                                                 
                             global GLOBAL_PROMPT
                             llm_prompt_components = PromptComponents(
@@ -1722,7 +1722,32 @@ def create_app():
 
         
         
-        
+            with gr.TabItem("Automatic Speech Recognition", id=4):
+                with gr.Row(visible=True) as row_vllm_audio:
+                    with gr.Column(scale=2):
+                        with gr.Accordion(("Automatic Speech Recognition"), open=True, visible=True) as acc_audio:
+                            audio_input = gr.Audio(label="Upload Audio", type="filepath")
+                            audio_model=gr.Dropdown(defaults_frontend['audio_models'], label="Model size", info="Select a Faster-Whisper model")
+                            audio_path = gr.Textbox(visible=False)
+                            device=gr.Radio(["cpu", "cuda"], value="cpu", label="Select architecture", info="Your system supports CUDA!. Make sure all drivers installed. /checkcuda if cuda")
+                            compute_type=gr.Radio(["int8"], value="int8", label="Compute type", info="Select a compute type")
+                
+                    with gr.Column(scale=1):
+                        with gr.Row(visible=True) as row_vllm_audio_actions:
+                            text_output = gr.Textbox(label="Transcription", lines=8)
+                            
+                            transcribe_btn = gr.Button("Transcribe")
+                            transcribe_btn.click(
+                            get_audio_path,
+                            audio_input,
+                            [text_output,audio_path]
+                            ).then(
+                            transcribe_audio,
+                            [audio_model,audio_path,device,compute_type],
+                            text_output
+                            )
+
+            
         
         
         
@@ -1778,9 +1803,6 @@ def create_app():
             with gr.Accordion(("GPU information"), open=False) as acc_gpu_dataframe:
                 gpu_dataframe = gr.Dataframe()
 
-            with gr.Accordion(("vLLM information"), open=False) as acc_vllm_dataframe:
-                vllm_dataframe = gr.Dataframe()
-
             with gr.Accordion(("Disk information"), open=False) as acc_disk_dataframe:
                 disk_dataframe = gr.Dataframe()
 
@@ -1799,40 +1821,6 @@ def create_app():
 
 
 
-
-        with gr.Tab("lion"):
-            lion_output = gr.Textbox(label="lion")
-            gr.Image("lion.jpg")
-            gr.Button("lion")
-        with gr.Tab("tiger"):
-            gr.Image("tiger.jpg")
-            gr.Button("tiger")
-
-
-        # aaaa3
-                
-        with gr.Accordion(("Automatic Speech Recognition"), open=False, visible=True) as acc_audio:
-            with gr.Row():
-                with gr.Column(scale=2):
-                    audio_input = gr.Audio(label="Upload Audio", type="filepath")
-                    audio_model=gr.Dropdown(defaults_frontend['audio_models'], label="Model size", info="Select a Faster-Whisper model")
-                    audio_path = gr.Textbox(visible=False)
-                    device=gr.Radio(["cpu", "cuda"], value="cpu", label="Select architecture", info="Your system supports CUDA!. Make sure all drivers installed. /checkcuda if cuda")
-                    compute_type=gr.Radio(["int8"], value="int8", label="Compute type", info="Select a compute type")
-                with gr.Column(scale=1):
-                    text_output = gr.Textbox(label="Transcription", lines=8)
-                    
-                    transcribe_btn = gr.Button("Transcribe")
-                    transcribe_btn.click(
-                      get_audio_path,
-                      audio_input,
-                      [text_output,audio_path]
-                    ).then(
-                      transcribe_audio,
-                      [audio_model,audio_path,device,compute_type],
-                      text_output
-                    )
-        
 
         
         btn_interface = gr.Button("Load Interface",visible=False)
@@ -2516,9 +2504,6 @@ def create_app():
             testtext
         )
 
-        vllm_timer = gr.Timer(1,active=True)
-        vllm_timer.tick(vllm_to_pd, outputs=vllm_dataframe)
-        
         disk_timer = gr.Timer(1,active=True)
         disk_timer.tick(disk_to_pd, outputs=disk_dataframe)
 

@@ -1563,6 +1563,9 @@ def parallel_download(selected_model_size, model_dropdown):
 
 
 
+def change_tab(n):
+    return gr.Tabs(selected=n)
+
 
 
 
@@ -1634,6 +1637,95 @@ def create_app():
                         
         
         
+        
+        vllms=gr.Radio(["vLLM1", "vLLM2", "Create New"], value="vLLM1", show_label=False, info="Select a vLLM or create a new one. Where?")
+        current_tab = gr.Number(value=0, visible=False)
+        with gr.Tabs() as tabs:
+            with gr.TabItem("Download", id=0):
+                with gr.Row(visible=True) as row_vllm_download:
+                    with gr.Column(scale=4):
+                        random_text = gr.Textbox(label="random_text")
+                
+                    with gr.Column(scale=1):                
+                        with gr.Row(visible=True) as row_download:
+                            btn_dl = gr.Button("DOWNLOAD", variant="primary")
+
+            with gr.TabItem("Load", id=1):
+                with gr.Row(visible=True) as row_vllm_load:
+                    with gr.Column(scale=4):
+                        with gr.Accordion(("Load vLLM Parameters"), open=False, visible=True) as acc_load:
+                            vllm_load_components = VllmLoadComponents(
+
+                                method=gr.Textbox(value="load", label="method", info=f"yee the req_method."),
+                                vllmcontainer=gr.Textbox(value="container_vllm_xoo", label="vllmcontainer", info=f"Select a container name which is running vLLM"),
+                                # vllmcontainer=gr.Radio(["container_vllm_xoo", "container_vllm_oai", "Create New"], value="container_vllm_xoo", show_label=False, info="Select a vllms_prompt or create a new one. Where?"),
+                                port=gr.Slider(1370, 1380, step=1, value=1370, label="port", info=f"Choose a port."),
+                                image=gr.Textbox(value="xoo4foo/zzvllm46:latest", label="image", info=f"Dockerhub vLLM image"),
+                                                                                
+                                max_model_len=gr.Slider(1024, 8192, step=1024, value=1024, label="max_model_len", info=f"Model context length. If unspecified, will be automatically derived from the model config."),
+                                tensor_parallel_size=gr.Number(1, 8, value=1, label="tensor_parallel_size", info=f"Number of tensor parallel replicas."),
+                                gpu_memory_utilization=gr.Slider(0.2, 0.99, value=0.87, label="gpu_memory_utilization", info=f"The fraction of GPU memory to be used for the model executor, which can range from 0 to 1.")
+                            )
+                
+                    with gr.Column(scale=1):
+                        with gr.Row(visible=True) as vllm_load_actions:
+                            btn_load = gr.Button("DEPLOY")
+
+            with gr.TabItem("Create", id=2):
+                with gr.Row(visible=True) as row_vllm_create:
+                    with gr.Column(scale=4):                         
+                        with gr.Accordion(("Create vLLM Parameters"), open=False, visible=True) as acc_create:
+                            vllm_create_components = VllmCreateComponents(
+
+                                method=gr.Textbox(value="create", label="method", info=f"yee the req_method."),
+                                
+                                image=gr.Textbox(value="xoo4foo/zzvllm46:latest", label="image", info=f"Dockerhub vLLM image"),
+                                runtime=gr.Textbox(value="nvidia", label="runtime", info=f"Container runtime"),
+                                shm_size=gr.Slider(1, 320, step=1, value=8, label="shm_size", info=f'Maximal GPU Memory in GB'),
+                                
+                                port=gr.Slider(1370, 1380, step=1, value=1370, label="port", info=f"Choose a port."),                        
+                                
+                                max_model_len=gr.Slider(1024, 8192, step=1024, value=1024, label="max_model_len", info=f"Model context length. If unspecified, will be automatically derived from the model config."),
+                                tensor_parallel_size=gr.Number(1, 8, value=1, label="tensor_parallel_size", info=f"Number of tensor parallel replicas."),
+                                gpu_memory_utilization=gr.Slider(0.2, 0.99, value=0.87, label="gpu_memory_utilization", info=f"The fraction of GPU memory to be used for the model executor, which can range from 0 to 1.")
+                            )
+                
+                    with gr.Column(scale=1):
+                        with gr.Row(visible=True) as vllm_create_actions:
+                            btn_create = gr.Button("CREATE", variant="primary")
+                            btn_create_close = gr.Button("CANCEL")
+
+
+            with gr.TabItem("Prompt", id=3):
+                with gr.Row(visible=True) as row_vllm_prompt:
+                    with gr.Column(scale=2):
+                        with gr.Accordion(("Prompt Parameters"), open=False, visible=True) as acc_prompt:
+                                                
+                            global GLOBAL_PROMPT
+                            llm_prompt_components = PromptComponents(
+                                vllmcontainer=gr.Radio(["container_vllm_xoo", "container_vllm_oai", "Create New"], value="container_vllm_oai", show_label=False, info="Select a vllms_prompt or create a new one. Where?"),
+                                port=gr.Slider(1370, 1380, step=1, value=1371, label="port", info=f"Choose a port."),
+                                prompt = gr.Textbox(placeholder=f'{GLOBAL_PROMPT}', value=f'{GLOBAL_PROMPT}', label="Prompt", show_label=True, visible=True),
+                                top_p=gr.Slider(0.01, 1.0, step=0.01, value=0.95, label="top_p", info=f'Float that controls the cumulative probability of the top tokens to consider'),
+                                temperature=gr.Slider(0.0, 0.99, step=0.01, value=0.8, label="temperature", info=f'Float that controls the randomness of the sampling. Lower values make the model more deterministic, while higher values make the model more random. Zero means greedy sampling'),
+                                max_tokens=gr.Slider(50, 2500, step=25, value=150, label="max_tokens", info=f'Maximum number of tokens to generate per output sequence')
+                            )
+                            testtext = gr.Textbox(placeholder="testplaceholder", value="testvalue", show_label=False, autofocus=True)
+                            with gr.Row():
+                                vllmsprompt=gr.Radio(["vLLM1", "vLLM2", "Create New"], value="vLLM1", show_label=False, info="Select a vLLM or create a new one. Where?") 
+                
+                    with gr.Column(scale=1):
+                        with gr.Row() as vllm_prompt_output:
+                            output_prompt = gr.Textbox(label="Prompt Output", lines=4, show_label=True)
+                        with gr.Row() as vllm_prompt:
+                            prompt_btn = gr.Button("PROMPT")
+
+        
+        
+        
+        
+        
+        
         output = gr.Textbox(label="Output", lines=4, show_label=True, visible=True)     
         
         # aaaa
@@ -1677,82 +1769,8 @@ def create_app():
         
         
         kekw = gr.Textbox(label="kekw")
-        with gr.Row(visible=True) as row_vllm:
-            with gr.Column(scale=4):
+
                 
-                
-                with gr.Row(visible=True) as row_select_vllm:
-                    vllms=gr.Radio(["vLLM1", "vLLM2", "Create New"], value="vLLM1", show_label=False, info="Select a vLLM or create a new one. Where?")
-                    
-                with gr.Accordion(("Create vLLM Parameters"), open=False, visible=True) as acc_create:
-                    vllm_create_components = VllmCreateComponents(
-
-                        method=gr.Textbox(value="create", label="method", info=f"yee the req_method."),
-                        
-                        image=gr.Textbox(value="xoo4foo/zzvllm46:latest", label="image", info=f"Dockerhub vLLM image"),
-                        runtime=gr.Textbox(value="nvidia", label="runtime", info=f"Container runtime"),
-                        shm_size=gr.Slider(1, 320, step=1, value=8, label="shm_size", info=f'Maximal GPU Memory in GB'),
-                        
-                        port=gr.Slider(1370, 1380, step=1, value=1370, label="port", info=f"Choose a port."),                        
-                        
-                        max_model_len=gr.Slider(1024, 8192, step=1024, value=1024, label="max_model_len", info=f"Model context length. If unspecified, will be automatically derived from the model config."),
-                        tensor_parallel_size=gr.Number(1, 8, value=1, label="tensor_parallel_size", info=f"Number of tensor parallel replicas."),
-                        gpu_memory_utilization=gr.Slider(0.2, 0.99, value=0.87, label="gpu_memory_utilization", info=f"The fraction of GPU memory to be used for the model executor, which can range from 0 to 1.")
-                    )
-                    
-                    
-
-                                        
-                with gr.Accordion(("Load vLLM Parameters"), open=False, visible=True) as acc_load:
-                    vllm_load_components = VllmLoadComponents(
-
-                        method=gr.Textbox(value="load", label="method", info=f"yee the req_method."),
-                        vllmcontainer=gr.Textbox(value="container_vllm_xoo", label="vllmcontainer", info=f"Select a container name which is running vLLM"),
-                        # vllmcontainer=gr.Radio(["container_vllm_xoo", "container_vllm_oai", "Create New"], value="container_vllm_xoo", show_label=False, info="Select a vllms_prompt or create a new one. Where?"),
-                        port=gr.Slider(1370, 1380, step=1, value=1370, label="port", info=f"Choose a port."),
-                        image=gr.Textbox(value="xoo4foo/zzvllm46:latest", label="image", info=f"Dockerhub vLLM image"),
-                                                                        
-                        max_model_len=gr.Slider(1024, 8192, step=1024, value=1024, label="max_model_len", info=f"Model context length. If unspecified, will be automatically derived from the model config."),
-                        tensor_parallel_size=gr.Number(1, 8, value=1, label="tensor_parallel_size", info=f"Number of tensor parallel replicas."),
-                        gpu_memory_utilization=gr.Slider(0.2, 0.99, value=0.87, label="gpu_memory_utilization", info=f"The fraction of GPU memory to be used for the model executor, which can range from 0 to 1.")
-                    )
-                    
-                    
-
-
-
-            with gr.Column(scale=1):
-                with gr.Row(visible=False) as row_download:
-                    btn_dl = gr.Button("DOWNLOAD", variant="primary")
-                with gr.Row(visible=False) as vllm_load_actions:
-                    btn_load = gr.Button("DEPLOY")
-                    # btn_vllm_running2 = gr.Button("CLEAR NU GO 1370")
-                    # btn_vllm_running3 = gr.Button("CLEAR TORCH", visible=True)
-                with gr.Row(visible=False) as vllm_create_actions:
-                    btn_create = gr.Button("CREATE", variant="primary")
-                    btn_create_close = gr.Button("CANCEL")
-            
-        with gr.Accordion(("Prompt Parameters"), open=False, visible=True) as acc_prompt:
-            with gr.Row():
-                with gr.Column(scale=2):
-                    
-                    global GLOBAL_PROMPT
-                    llm_prompt_components = PromptComponents(
-                        vllmcontainer=gr.Radio(["container_vllm_xoo", "container_vllm_oai", "Create New"], value="container_vllm_oai", show_label=False, info="Select a vllms_prompt or create a new one. Where?"),
-                        port=gr.Slider(1370, 1380, step=1, value=1371, label="port", info=f"Choose a port."),
-                        prompt = gr.Textbox(placeholder=f'{GLOBAL_PROMPT}', value=f'{GLOBAL_PROMPT}', label="Prompt", show_label=True, visible=True),
-                        top_p=gr.Slider(0.01, 1.0, step=0.01, value=0.95, label="top_p", info=f'Float that controls the cumulative probability of the top tokens to consider'),
-                        temperature=gr.Slider(0.0, 0.99, step=0.01, value=0.8, label="temperature", info=f'Float that controls the randomness of the sampling. Lower values make the model more deterministic, while higher values make the model more random. Zero means greedy sampling'),
-                        max_tokens=gr.Slider(50, 2500, step=25, value=150, label="max_tokens", info=f'Maximum number of tokens to generate per output sequence')
-                    )
-                    testtext = gr.Textbox(placeholder="testplaceholder", value="testvalue", show_label=False, autofocus=True)
-                    with gr.Row():
-                        vllmsprompt=gr.Radio(["vLLM1", "vLLM2", "Create New"], value="vLLM1", show_label=False, info="Select a vLLM or create a new one. Where?")  
-                with gr.Column(scale=1):
-                    with gr.Row() as vllm_prompt_output:
-                        output_prompt = gr.Textbox(label="Prompt Output", lines=4, show_label=True)
-                    with gr.Row() as vllm_prompt:
-                        prompt_btn = gr.Button("PROMPT")
 
 
         with gr.Accordion(("System Stats"), open=False) as acc_system_stats:
@@ -2225,6 +2243,25 @@ def create_app():
                     )
         
         
+        
+        
+        
+        
+        
+        
+        current_tab.change(
+            change_tab,
+            current_tab,
+            tabs
+        )
+        
+        
+        
+        
+        
+        
+        
+        
         device.change(
             toggle_compute_type,
             device,
@@ -2329,10 +2366,6 @@ def create_app():
             None,
             vllm_load_actions
         ).then(
-            lambda: gr.update(visible=True),
-            None,
-            row_select_vllm
-        ).then(
             lambda: gr.update(visible=True, open=False),
             None,
             acc_load
@@ -2383,10 +2416,6 @@ def create_app():
             None, 
             row_model_info
         ).then(
-            lambda: gr.update(visible=True), 
-            None, 
-            row_vllm
-        ).then(
             gr_load_check, 
             [selected_model_id, selected_model_architectures, selected_model_pipeline_tag, selected_model_transformers, selected_model_size, selected_model_private, selected_model_gated, selected_model_model_type, selected_model_quantization],
             [output,row_download,btn_load]
@@ -2416,10 +2445,6 @@ def create_app():
             lambda: gr.update(visible=True, open=False), # hier
             None, 
             acc_load    
-        ).then(
-            lambda: gr.update(visible=True), # hier
-            None, 
-            row_select_vllm   
         ).then(
             llm_load,
             vllm_load_components.to_list(),

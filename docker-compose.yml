@@ -82,7 +82,7 @@ services:
     container_name: container_vllm_xoo
     volumes:
       - /models:/models
-    shm_size: 8gb
+    shm_size: 16gb
     environment:
       - NCCL_DEBUG=INFO
       - VLLM_PORT=1370
@@ -92,7 +92,7 @@ services:
       "--port", "1370",
       "--tensor-parallel-size", "2",
       "--gpu-memory-utilization", "0.85",
-      "--max-model-len", "4096"
+      "--max-model-len", "2048"
     ]
 
   vllm2:
@@ -115,15 +115,15 @@ services:
     volumes:
       - /root/.cache/huggingface/hub:/root/.cache/huggingface/hub
       - /models:/root/.cache/huggingface/hub
-    shm_size: 8gb
+    shm_size: 16gb
     environment:
       - NCCL_DEBUG=INFO
     command: [
       "--model", "Qwen/Qwen2.5-1.5B-Instruct",
       "--port", "1371",
       "--tensor-parallel-size", "2",
-      "--gpu-memory-utilization", "0.95",
-      "--max-model-len", "4096",
+      "--gpu-memory-utilization", "0.77",
+      "--max-model-len", "2048",
     ]
   frontend:
     build:

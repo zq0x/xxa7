@@ -1728,27 +1728,19 @@ def create_app():
                         with gr.Accordion(("Automatic Speech Recognition"), open=True, visible=True) as acc_audio:
                             audio_input = gr.Audio(label="Upload Audio", type="filepath")
                             audio_model=gr.Dropdown(defaults_frontend['audio_models'], label="Model size", info="Select a Faster-Whisper model")
-                            audio_path = gr.Textbox(visible=False)
+                            
                             device=gr.Radio(["cpu", "cuda"], value="cpu", label="Select architecture", info="Your system supports CUDA!. Make sure all drivers installed. /checkcuda if cuda")
                             compute_type=gr.Radio(["int8"], value="int8", label="Compute type", info="Select a compute type")
                 
                     with gr.Column(scale=1):
                         with gr.Row(visible=True) as row_vllm_audio_actions:
-                            text_output = gr.Textbox(label="Transcription", lines=8)
+                            with gr.Row() as vllm_prompt_output:
+                                audio_path = gr.Textbox(visible=True)
+                                text_output = gr.Textbox(label="Transcription", lines=8)
+                            with gr.Row() as vllm_prompt:
+                                transcribe_btn = gr.Button("Transcribe")
                             
-                            transcribe_btn = gr.Button("Transcribe")
-                            transcribe_btn.click(
-                            get_audio_path,
-                            audio_input,
-                            [text_output,audio_path]
-                            ).then(
-                            transcribe_audio,
-                            [audio_model,audio_path,device,compute_type],
-                            text_output
-                            )
 
-            
-        
         
         
         output = gr.Textbox(label="Output", lines=4, show_label=True, visible=True)     
@@ -1759,8 +1751,16 @@ def create_app():
         
         
         
-        
-        
+
+        transcribe_btn.click(
+            get_audio_path,
+            audio_input,
+            [text_output,audio_path]
+            ).then(
+            transcribe_audio,
+            [audio_model,audio_path,device,compute_type],
+            text_output
+        )
         
         
         
